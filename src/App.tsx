@@ -1,0 +1,88 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Services from './pages/Services';
+import ServiceCreation from './pages/ServiceCreation';
+import ServiceDetail from './pages/ServiceDetail';
+import Documents from './pages/Documents';
+import Clients from './pages/Clients';
+import InviteClient from './pages/InviteClient';
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Protected routes */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout>
+                <Dashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/services" element={
+            <ProtectedRoute>
+              <Layout>
+                <Services />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/services/new" element={
+            <ProtectedRoute>
+              <Layout>
+                <ServiceCreation />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/clients" element={
+            <ProtectedRoute>
+              <Layout>
+                <Clients />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/clients/invite" element={
+            <ProtectedRoute>
+              <Layout>
+                <InviteClient />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/services/:id" element={
+            <ProtectedRoute>
+              <Layout>
+                <ServiceDetail />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/documents" element={
+            <ProtectedRoute>
+              <Layout>
+                <Documents />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirect unknown routes */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  );
+}
+
+export default App;
