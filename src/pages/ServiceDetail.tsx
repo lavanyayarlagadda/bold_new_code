@@ -64,7 +64,6 @@ export default function ServiceDetail() {
   const [isEditService, setIsEditService] = useState(false);
   const [taskStatuses, setTaskStatuses] = useState<Record<string, string>>({});
 
-
   const service = mockServices.find((s) => s.id === id);
   const client = mockClients.find((c) => c.id === service?.clientId);
 
@@ -549,23 +548,24 @@ export default function ServiceDetail() {
                                     : ""}
                                 </p>
                               )}
-
-                              <div className="flex items-center space-x-2 mt-3 float-end">
-                                <button
-                                  onClick={() => saveTaskChanges(task.id)}
-                                  className="flex items-center px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                                >
-                                  <Save className="h-3 w-3 mr-1" />
-                                  Save
-                                </button>
-                                <button
-                                  onClick={() => cancelTaskEdit(task.id)}
-                                  className="flex items-center px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                >
-                                  <X className="h-3 w-3 mr-1" />
-                                  Cancel
-                                </button>
-                              </div>
+                              {editingTask && (
+                                <div className="flex items-center space-x-2 mt-3 float-end">
+                                  <button
+                                    onClick={() => saveTaskChanges(task.id)}
+                                    className="flex items-center px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                                  >
+                                    <Save className="h-3 w-3 mr-1" />
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => cancelTaskEdit(task.id)}
+                                    className="flex items-center px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
                             </>
                           )}
                         </div>

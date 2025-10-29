@@ -20,6 +20,8 @@ import {
   // mockServiceTemplates,
 } from "../data/mockData";
 import { format } from "date-fns";
+import TableWithPagination from "../components/TableWithPagination";
+
 
 export default function Services() {
   const { user } = useAuth();
@@ -410,42 +412,22 @@ export default function Services() {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">
-                    Service
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">
-                    Client
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">
-                    Assigned To
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">
-                    Progress
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">
-                    Due Date
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredServices.map((service) => (
-                  <ServiceRow key={service.id} service={service} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <TableWithPagination
+          columns={[
+            { label: "Service", width: "w-[200px]" },
+            { label: "Client" },
+            { label: "Assigned To" },
+            { label: "Status", width: "w-[110px]" },
+            { label: "Progress" },
+            { label: "Due Date" },
+            { label: "Actions" },
+          ]}
+          data={filteredServices}
+          rowsPerPage={5}
+          renderRow={(service) => (
+            <ServiceRow key={service.id} service={service} />
+          )}
+        />
       )}
 
       {filteredServices.length === 0 && (
