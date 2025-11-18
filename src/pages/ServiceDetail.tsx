@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -17,56 +17,118 @@ import {
   Send,
   // Eye,
   // EyeOff,
-  ChevronDown,
-  ChevronUp,
+  // ChevronDown,
+  // ChevronUp,
   // Settings,
   Save,
   X,
   // DeleteIcon,
-  Trash2,
+  // Trash2,
   Edit2,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import {
-  mockServices,
-  mockClients,
-  mockComments,
-  mockDocuments,
-} from "../data/mockData";
 import { format, formatDistanceToNow } from "date-fns";
-
-// Mock staff data for assignments
-const mockStaff = [
-  { id: "2", name: "Michael Chen", role: "Senior Accountant" },
-  { id: "3", name: "Emma Williams", role: "Tax Specialist" },
-  { id: "5", name: "David Rodriguez", role: "Junior Accountant" },
-  { id: "6", name: "Sarah Thompson", role: "Partner" },
-];
-
-const taskStatus = [
-  { id: "1", status: "Todo" },
-  { id: "2", status: "InProgress" },
-  { id: "3", status: "Completed" },
-];
+import ActivityTimeline from "../components/ActivityTimeline";
+import {
+  useFetchServiceTaskDetailsQuery,
+  useSaveCommentsMutation,
+} from "../redux/services/serviceTasksApi";
+import {
+  SingleUser,
+  TaskFormData,
+  useCreateUpdateTaskMutation,
+  useGetAllServicesQuery,
+  useGetAllUsersQuery,
+} from "../redux/services/dropdownApi";
+import TaskModal from "../components/ReusableComponents/TaskModal";
+import { toast } from "react-toastify";
+import { isKeyObject } from "node:util/types";
+interface Task {
+  serviceId: number;
+  taskId: number;
+  taskName: string;
+  taskDescription: string;
+  assigneeName: string;
+  assignedId: string | number;
+  status: string;
+  dueDate: string;
+  priorityLabel: string;
+  statusId?: number;
+}
 
 export default function ServiceDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { serviceId } = useParams<{ serviceId: string }>();
+  const numericServiceId = serviceId ? Number(serviceId) : undefined;
+
+  console.log("Service ID:", numericServiceId);
+
+  // 🔹 Call your API only when serviceId exists
+  const {
+    data: serviceTaskDetails,
+    isLoading,
+    error,
+    refetch: refetchServiceTaskDetails,
+  } = useFetchServiceTaskDetailsQuery(numericServiceId!, {
+    skip: !numericServiceId,
+  });
+  const [saveComment, { isLoading: isSaving, error: saveError }] =
+    useSaveCommentsMutation();
+  const [
+    createUpdateTasks,
+    { isLoading: iscreateupdatetaskLoading, error: taskCreateUpdateError },
+  ] = useCreateUpdateTaskMutation();
+
   const { user } = useAuth();
   const [newComment, setNewComment] = useState("");
   const [isInternal, setIsInternal] = useState(false);
-  const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
   // const [showAISummary, setShowAISummary] = useState(true);
-  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<number | null>(null);
   const [taskAssignments, setTaskAssignments] = useState<
-    Record<string, string>
+    Record<number, number | "">
   >({});
+
   const [taskDueDates, setTaskDueDates] = useState<Record<string, string>>({});
   const [isEditService, setIsEditService] = useState(false);
-  const [taskStatuses, setTaskStatuses] = useState<Record<string, string>>({});
 
-  const service = mockServices.find((s) => s.id === id);
-  const client = mockClients.find((c) => c.id === service?.clientId);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const serviceInfo = serviceTaskDetails?.data?.serviceInformation;
+  const tasksList = serviceTaskDetails?.data?.taskList || [];
+  const assignedTeam = serviceTaskDetails?.data?.assignedTeam || [];
+  const doccuments = serviceTaskDetails?.data?.documents || [];
+  const comments = serviceTaskDetails?.data?.comments || [];
+  const ActivityTime = serviceTaskDetails?.data?.activityLogs || [];
+  const service = serviceInfo;
+  // const tasks = tasksList;
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [staffList, setStaffList] = useState<SingleUser[]>([]);
+  const [serviceName, setServiceName] = useState("");
+  console.log("TASKID", tasks, tasksList);
+  const clientId = serviceTaskDetails?.data?.serviceInformation?.clientId;
+  console.log("clientId", clientId);
 
+  console.log("ActivityTimeline", ActivityTime);
+  const { data: statusData } = useGetAllServicesQuery();
+  const { data: usersData } = useGetAllUsersQuery();
+  const allStatus = statusData?.data || [];
+  const allUsers = usersData?.data || [];
+
+  useEffect(() => {
+    if (serviceInfo) {
+      const service = serviceInfo.serviceName;
+      setServiceName(service);
+    }
+  }, [serviceInfo]);
+  useEffect(() => {
+    if (tasksList && tasksList.length > 0) {
+      setTasks(tasksList);
+    }
+  }, [tasksList]);
+
+  useEffect(() => {
+    if (allUsers && allUsers.length > 0) {
+      setStaffList(allUsers);
+    }
+  }, [allUsers]);
   if (!service) {
     return (
       <div className="text-center py-12">
@@ -80,57 +142,85 @@ export default function ServiceDetail() {
       </div>
     );
   }
-  const handleTaskStatusChange = (taskId: string, newStatus: string) => {
-    setTaskStatuses((prev) => ({
-      ...prev,
-      [taskId]: newStatus,
-    }));
+
+  if (!serviceId) return <p>Invalid service ID</p>;
+  if (isLoading) return <p>Loading...</p>;
+  if (error) return <p>Error fetching details</p>;
+
+  console.log("serviceDetails", serviceTaskDetails);
+  const handleTaskStatusChange = (taskId: number, statusId: number | null) => {
+    console.log(`Task ${taskId} changed to status: ${statusId}`);
+    // setTaskStatuses((prev) => ({
+    //   ...prev,
+    //   [taskId]: newStatus,
+    // }));
+    updateTaskField(taskId, "statusId", statusId);
   };
-  const handleTaskToggle = (taskId: string) => {
-    if (expandedTasks.includes(taskId)) {
-      setExpandedTasks(expandedTasks.filter((id) => id !== taskId));
+
+  const handleTaskAssignment = (taskId: number, assignedId: number | "") => {
+    // setTaskAssignments((prev) => ({
+    //   ...prev,
+    //   [taskId]: assigneeId,
+    // }));
+    console.log("handleTaskAssignment", taskId, assignedId);
+    updateTaskField(taskId, "assignedId", assignedId);
+  };
+
+  const handleTaskDueDate = (taskId: number, dueDate: string) => {
+    updateTaskField(taskId, "dueDate", dueDate);
+  };
+
+  const getTaskName = (users: any, assignedId: number) => {
+    const obj = users?.find((user: any) => user.userId == assignedId);
+    console.log("objj", obj);
+    return obj.fullName;
+  };
+
+  const saveTaskChanges = async (
+    task: TaskFormData,
+    mode: "create" | "update"
+  ) => {
+    console.log("taskedit", task);
+    let payload: any = {
+      taskId: task.taskId || 0,
+      serviceId: Number(task.serviceId),
+      clientId: Number(clientId),
+      taskName: task.taskName,
+      dueDate: task.dueDate,
+      taskDescription: task.taskDescription,
+      // assigneeId: Number(task.assignedId),
+      statusId: Number(task.statusId),
+      createdBy: 2,
+      updatedBy: 2,
+    };
+
+    if (mode === "create") {
+      payload.assigneeId = Number(task.assigneeId);
     } else {
-      setExpandedTasks([...expandedTasks, taskId]);
+      payload.assigneeId = Number(task.assignedId);
     }
-  };
+    try {
+      console.log("Payload:", payload);
 
-  const handleTaskAssignment = (taskId: string, assigneeId: string) => {
-    setTaskAssignments((prev) => ({
-      ...prev,
-      [taskId]: assigneeId,
-    }));
-  };
+      const response = await createUpdateTasks(payload).unwrap();
+      console.log("Task saved successfully:", response);
+      toast.success(response.message || "Task Updated successfully");
+      refetchServiceTaskDetails();
+      setEditingTask(null);
+      setShowTaskModal(false);
+    } catch (err: any) {
+      toast.error("Something went wrong", err);
+      console.error("Task save failed:", err);
 
-  const handleTaskDueDate = (taskId: string, dueDate: string) => {
-    setTaskDueDates((prev) => ({
-      ...prev,
-      [taskId]: dueDate,
-    }));
-  };
-
-  const saveTaskChanges = (taskId: string) => {
-    // In a real app, this would make an API call
-    console.log("Saving task changes:", {
-      taskId,
-      assignee: taskAssignments[taskId],
-      dueDate: taskDueDates[taskId],
-    });
+      // OPTIONAL: Show error toast
+      // toast.error("Failed to save task");
+    }
     setEditingTask(null);
   };
 
-  const cancelTaskEdit = (taskId: string) => {
-    // Reset changes
-    const task = service?.tasks.find((t) => t.id === taskId);
-    if (task) {
-      setTaskAssignments((prev) => ({
-        ...prev,
-        [taskId]: task.assignedTo || "",
-      }));
-      setTaskDueDates((prev) => ({
-        ...prev,
-        [taskId]: task.dueDate ? format(task.dueDate, "yyyy-MM-dd") : "",
-      }));
-    }
+  const cancelTaskEdit = (taskId: number) => {
+    console.log("iddd", taskId);
+
     setEditingTask(null);
   };
 
@@ -179,13 +269,48 @@ export default function ServiceDetail() {
     }
   };
 
-  const handleCommentSubmit = (e: React.FormEvent) => {
+  const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    // In a real app, this would make an API call
-    console.log("Adding comment:", { content: newComment, isInternal });
-    setNewComment("");
+    // // In a real app, this would make an API call
+    // console.log("Adding comment:", { content: newComment, isInternal });
+    // setNewComment("");
+    try {
+      const payload = {
+        userId: 2,
+        clientId: clientId ?? 0,
+        serviceId: Number(serviceId),
+        message: newComment,
+        isInternal: isInternal ? 1 : 0,
+      };
+
+      console.log("Submitting comment payload:", payload);
+
+      const response = await saveComment(payload).unwrap();
+
+      console.log("Comment saved successfully:", response);
+      toast.success("Comment saved successfully");
+      refetchServiceTaskDetails();
+      // setComments((prev) => [...prev, response.data]);
+      setNewComment("");
+      setIsInternal(false);
+    } catch (error) {
+      console.error("Error saving comment:", error);
+      toast.error("Error saving comment");
+    }
+  };
+
+  const updateTaskField = (taskId: number, field: string, value: any) => {
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.taskId === taskId ? { ...task, [field]: value } : task
+      )
+    );
+
+    setTimeout(() => {
+      console.log("TakssetTimeout", tasks);
+    }, 1000);
   };
 
   return (
@@ -200,8 +325,10 @@ export default function ServiceDetail() {
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{service.name}</h1>
-            <p className="text-gray-600">{service.description}</p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {service?.clientName}
+            </h1>
+            <p className="text-gray-600">{service?.clientName}</p>
           </div>
         </div>
         {(user?.role === "admin" || user?.role === "staff") && (
@@ -226,10 +353,10 @@ export default function ServiceDetail() {
               </h2>
               <span
                 className={`px-3 py-1 text-sm rounded-full font-medium ${getStatusColor(
-                  service.status
+                  service?.status || ""
                 )}`}
               >
-                {service.status.replace("_", " ")}
+                {service?.status || ""}
               </span>
             </div>
 
@@ -238,7 +365,9 @@ export default function ServiceDetail() {
                 <User className="h-5 w-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600">Client</p>
-                  <p className="font-medium text-gray-900">{client?.name}</p>
+                  <p className="font-medium text-gray-900">
+                    {service?.clientName}
+                  </p>
                 </div>
               </div>
 
@@ -247,7 +376,7 @@ export default function ServiceDetail() {
                 <div>
                   <p className="text-sm text-gray-600">Due Date</p>
                   <p className="font-medium text-gray-900">
-                    {format(service.dueDate, "PPP")}
+                    {service?.dueDate || ""}
                   </p>
                 </div>
               </div>
@@ -255,26 +384,26 @@ export default function ServiceDetail() {
               <div className="flex items-center space-x-3">
                 <div
                   className={`w-3 h-3 rounded-full ${getPriorityColor(
-                    service.priority
+                    service?.priorityLabel || ""
                   )}`}
                 ></div>
                 <div>
                   <p className="text-sm text-gray-600">Priority</p>
                   <p className="font-medium text-gray-900 capitalize">
-                    {service.priority}
+                    {service?.priorityLabel || ""}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
+              {/* <div className="flex items-center space-x-3">
                 <Clock className="h-5 w-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600">Service Type</p>
                   <p className="font-medium text-gray-900">
-                    {service.serviceType}
+                    {service?.serviceType}
                   </p>
                 </div>
-              </div>
+              </div> */}
             </div>
 
             <div className="mt-6">
@@ -283,13 +412,13 @@ export default function ServiceDetail() {
                   Progress
                 </span>
                 <span className="text-sm font-medium text-gray-900">
-                  {service.progress}%
+                  {service?.progressPercent}%
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
                   className="bg-blue-500 h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${service.progress}%` }}
+                  style={{ width: `${service?.progressPercent}%` }}
                 ></div>
               </div>
             </div>
@@ -317,152 +446,141 @@ export default function ServiceDetail() {
           )} */}
 
           {/* Tasks Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
-              {(user?.role === "admin" || user?.role === "staff") &&
-                isEditService && (
-                  <button className="flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Task
-                  </button>
-                )}
-            </div>
+          {tasks && tasks.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
+                {(user?.role === "admin" || user?.role === "staff") &&
+                  isEditService && (
+                    <button
+                      className="flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                      onClick={() => setShowTaskModal(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Task
+                    </button>
+                  )}
+              </div>
 
-            <div className="space-y-3">
-              {service.tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="border border-gray-200 rounded-lg p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3 flex-1">
-                      <TaskIcon status={task.status} />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">
-                          {task.title}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {task.description}
-                        </p>
+              <div className="space-y-3">
+                {tasks.map((task) => (
+                  <div
+                    key={task.taskId}
+                    className="border border-gray-200 rounded-lg p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3 flex-1">
+                        <TaskIcon status={task.status} />
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">
+                            {task.taskName}
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {task.taskDescription}
+                          </p>
 
-                        <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                          {task.assignedTo &&
-                            !expandedTasks.includes(task.id) && (
+                          <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                            {task.assigneeName && (
                               <span className="flex items-center">
                                 <User className="h-3 w-3 mr-1" />
-                                {mockStaff.find((s) => s.id === task.assignedTo)
-                                  ?.name || "Staff Member"}
+                                {task.assigneeName}
                               </span>
                             )}
-                          {task.dueDate && !expandedTasks.includes(task.id) && (
-                            <span className="flex items-center">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              Due {format(task.dueDate, "MMM d")}
-                            </span>
-                          )}
+                            {task.dueDate && (
+                              <span className="flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Due {task.dueDate}
+                              </span>
+                            )}
 
-                          <span className="flex items-center">
+                            {/* <span className="flex items-center">
                             <Clock className="h-3 w-3 mr-1" />
                             {task.estimatedHours}h estimated
                             {task.actualHours &&
                               ` / ${task.actualHours}h actual`}
-                          </span>
+                          </span> */}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <select
-                        value={
-                          taskStatuses[task.id] ||
-                          (task.status === "pending"
-                            ? "Todo"
-                            : task.status === "in_progress"
-                            ? "InProgress"
-                            : task.status === "completed"
-                            ? "Completed"
-                            : "Todo")
+                      <div className="flex items-center space-x-2">
+                        <select
+                          value={task.statusId || ""}
+                          onChange={(e) =>
+                            handleTaskStatusChange(
+                              task.taskId,
+                              e.target.value ? Number(e.target.value) : null
+                            )
+                          }
+                          className={`text-xs px-2 py-1 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
+                        >
+                          {" "}
+                          {allStatus.map((option) => (
+                            <option
+                              key={option.statusId}
+                              value={option.statusId}
+                            >
+                              {option.statusName}
+                            </option>
+                          ))}
+                        </select>
+                        {
+                          // (user?.role === "admin" || user?.role === "staff") &&
+                          // isEditService && (
+                          //   // editingTask !== task.taskId && (
+                          //   <button
+                          //     onClick={() => {
+                          //       setEditingTask(task.taskId);
+                          //       setTaskAssignments((prev) => ({
+                          //         ...prev,
+                          //         [task.taskId]: task.assigneeName || "",
+                          //       }));
+                          //       setTaskDueDates((prev) => ({
+                          //         ...prev,
+                          //         [task.taskId]: task.dueDate
+                          //           ? format(task.dueDate, "yyyy-MM-dd")
+                          //           : "",
+                          //       }));
+                          //     }}
+                          //     className="p-1 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          //     title="Edit assignment and due date"
+                          //   >
+                          //     <Trash2 className="h-3 w-3" />
+                          //   </button>
+                          // )
+                          // )
                         }
-                        onChange={(e) =>
-                          handleTaskStatusChange(task.id, e.target.value)
-                        }
-                        className={`text-xs px-2 py-1 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
-                      >
-                        {" "}
-                        {taskStatus.map((option) => (
-                          <option key={option.id} value={option.status}>
-                            {option.status === "InProgress"
-                              ? "In Progress"
-                              : option.status}
-                          </option>
-                        ))}
-                      </select>
-                      {(user?.role === "admin" || user?.role === "staff") &&
-                        isEditService &&
-                        editingTask !== task.id && (
-                          <button
-                            onClick={() => {
-                              setEditingTask(task.id);
-                              setTaskAssignments((prev) => ({
-                                ...prev,
-                                [task.id]: task.assignedTo || "",
-                              }));
-                              setTaskDueDates((prev) => ({
-                                ...prev,
-                                [task.id]: task.dueDate
-                                  ? format(task.dueDate, "yyyy-MM-dd")
-                                  : "",
-                              }));
-                            }}
-                            className="p-1 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Edit assignment and due date"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        )}
-                      <button
-                        onClick={() => handleTaskToggle(task.id)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        {expandedTasks.includes(task.id) ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {expandedTasks.includes(task.id) && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-gray-600 font-medium">
-                          Task Details
-                        </p>
-                        <Edit2
-                          className="text-gray-500 hover:text-blue-600 cursor-pointer h-4 w-4"
-                          onClick={() => {
-                            // setIsTaskDetailsEditable(true);
-                            setEditingTask(task.id);
-
-                            // initialize state with current values
-                            setTaskAssignments((prev) => ({
-                              ...prev,
-                              [task.id]: task.assignedTo || "",
-                            }));
-                            setTaskDueDates((prev) => ({
-                              ...prev,
-                              [task.id]: task.dueDate
-                                ? format(task.dueDate, "yyyy-MM-dd")
-                                : "",
-                            }));
-                          }}
-                        />
+                        {/* <button
+                          onClick={() => handleTaskToggle(task.taskId)}
+                          className="p-1 hover:bg-gray-100 rounded"
+                        >
+                          {expandedTasks.includes(task.taskId) ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button> */}
                       </div>
+                    </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          {/* <p className="text-gray-900">Order: #{task.order}</p> */}
+                    {/* {expandedTasks.includes(task.taskId) && ( */}
+                    {isEditService && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-gray-600 font-medium">
+                            Task Details
+                          </p>
+                          <Edit2
+                            className="text-gray-500 hover:text-blue-600 cursor-pointer h-4 w-4"
+                            onClick={() => {
+                              // setIsTaskDetailsEditable(true);
+                              setEditingTask(task.taskId);
+                            }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          {/* <div>
+                        
                           {task.isRequired && (
                             <p className="text-gray-900">
                               Required: {task.isRequired ? "Yes" : "No"}
@@ -474,111 +592,124 @@ export default function ServiceDetail() {
                               Completed: {format(task.completionDate, "PPP")}
                             </p>
                           )}
-                        </div>
-                        <div>
+                        </div> */}
+
                           {/* <p className="text-gray-600 mb-1">Time Tracking</p> */}
-                          {task.assignedTo && (
-                            <>
-                              {editingTask ? (
-                                <select
-                                  value={
-                                    taskAssignments[task.id] ||
-                                    task.assignedTo ||
-                                    ""
-                                  }
-                                  onChange={(e) =>
-                                    handleTaskAssignment(
-                                      task.id,
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                  <option value="">Unassigned</option>
-                                  {mockStaff.map((staff) => (
-                                    <option key={staff.id} value={staff.id}>
-                                      {staff.name} ({staff.role})
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <p className="text-gray-900">
-                                  Assigned To: {task.assignedTo}
-                                </p>
-                              )}
-                            </>
+                          {/* {task.assigneeName && ( */}
+
+                          {editingTask === task.taskId ? (
+                            <select
+                              value={task.assignedId || ""}
+                              // value={
+                              //   taskAssignments[task.taskId] ??
+                              //   task.assignedId ??
+                              //   ""
+                              // }
+                              onChange={(e) =>
+                                handleTaskAssignment(
+                                  task.taskId,
+                                  e.target.value ? Number(e.target.value) : ""
+                                )
+                              }
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="">Unassigned</option>
+                              {allUsers.map((user) => (
+                                <option key={user.userId} value={user.userId}>
+                                  {user.fullName} ({user.role.roleName})
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="text-gray-900">
+                              Assigned To:{" "}
+                              {/* {getTaskName(allUsers, Number(task.assignedId || null))} */}
+                              {task.assigneeName || ""}
+                            </p>
                           )}
-                          {task.dueDate && (
-                            <>
-                              {editingTask ? (
-                                // <input
-                                //   type="date"
-                                //   value={
-                                //     taskDueDates[task.id] ||
-                                //     (task.dueDate
-                                //       ? format(task.dueDate, "yyyy-MM-dd")
-                                //       : "")
-                                //   }
-                                //   onChange={(e) =>
-                                //     setTaskDueDates((prev) => ({
-                                //       ...prev,
-                                //       [task.id]: e.target.value,
-                                //     }))
-                                //   }
-                                //   className="border rounded px-2 py-1 text-sm w-full"
-                                // />
-                                <input
-                                  type="date"
-                                  value={
-                                    taskDueDates[task.id] ||
-                                    (task.dueDate
-                                      ? format(task.dueDate, "yyyy-MM-dd")
-                                      : "")
-                                  }
-                                  onChange={(e) =>
-                                    handleTaskDueDate(task.id, e.target.value)
-                                  }
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent mt-2"
-                                />
-                              ) : (
-                                <p className="text-gray-900">
-                                  Due Date:{" "}
-                                  {task.dueDate
-                                    ? format(task.dueDate, "yyyy-MM-dd")
-                                    : ""}
-                                </p>
-                              )}
-                              {editingTask && (
-                                <div className="flex items-center space-x-2 mt-3 float-end">
-                                  <button
-                                    onClick={() => saveTaskChanges(task.id)}
-                                    className="flex items-center px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                                  >
+
+                          {/* // )} */}
+                          {/* {task.dueDate && ( */}
+
+                          {/* // )} */}
+
+                          {editingTask === task.taskId ? (
+                            // <input
+                            //   type="date"
+                            //   value={
+                            //     taskDueDates[task.id] ||
+                            //     (task.dueDate
+                            //       ? format(task.dueDate, "yyyy-MM-dd")
+                            //       : "")
+                            //   }
+                            //   onChange={(e) =>
+                            //     setTaskDueDates((prev) => ({
+                            //       ...prev,
+                            //       [task.id]: e.target.value,
+                            //     }))
+                            //   }
+                            //   className="border rounded px-2 py-1 text-sm w-full"
+                            // />
+                            <input
+                              type="date"
+                              // value={
+                              //   taskDueDates[task.taskId] ||
+                              //   (task.dueDate ? task.dueDate : "")
+                              // }
+                              value={task.dueDate ? task.dueDate : ""}
+                              onChange={(e) =>
+                                handleTaskDueDate(task.taskId, e.target.value)
+                              }
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent "
+                            />
+                          ) : (
+                            <p className="text-gray-900">
+                              Due Date: {task.dueDate ? task.dueDate : ""}
+                            </p>
+                          )}
+
+                          {editingTask && (
+                            <div className="flex items-center space-x-2  float-end">
+                              <button
+                                onClick={() => saveTaskChanges(task, "update")}
+                                disabled={iscreateupdatetaskLoading}
+                                className={`flex items-center px-2 py-1 text-xs text-white rounded transition-colors
+    ${
+      iscreateupdatetaskLoading
+        ? "bg-gray-400"
+        : "bg-green-600 hover:bg-green-700"
+    }`}
+                              >
+                                {iscreateupdatetaskLoading ? (
+                                  "Submitting..."
+                                ) : (
+                                  <>
                                     <Save className="h-3 w-3 mr-1" />
                                     Save
-                                  </button>
-                                  <button
-                                    onClick={() => cancelTaskEdit(task.id)}
-                                    className="flex items-center px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                  >
-                                    <X className="h-3 w-3 mr-1" />
-                                    Cancel
-                                  </button>
-                                </div>
-                              )}
-                            </>
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => cancelTaskEdit(task.taskId)}
+                                className="flex items-center px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Cancel
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                    {/* // )} */}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-
+          )}
           {/* Task Timeline/History */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          {/* <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Activity Timeline
             </h2>
@@ -620,7 +751,10 @@ export default function ServiceDetail() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
+          {ActivityTime && ActivityTime.length > 0 && (
+            <ActivityTimeline logs={ActivityTime} />
+          )}
         </div>
 
         {/* Sidebar */}
@@ -631,20 +765,18 @@ export default function ServiceDetail() {
               Assigned Team
             </h3>
             <div className="space-y-3">
-              {service.assignedTo.map((userId, index) => (
-                <div key={userId} className="flex items-center space-x-3">
+              {assignedTeam.map((team) => (
+                <div key={team.userId} className="flex items-center space-x-3">
                   <img
-                    src={`https://ui-avatars.com/api/?name=User${userId}&background=0ea5e9&color=fff`}
-                    alt={`User ${userId}`}
+                    src={`https://ui-avatars.com/api/?name=User${team.userId}&background=0ea5e9&color=fff`}
+                    alt={`User ${team.userId}`}
                     className="h-8 w-8 rounded-full"
                   />
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {userId === "2" ? "Michael Chen" : "Emma Williams"}
+                      {team.assignedUser}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {userId === "2" ? "Senior Accountant" : "Tax Specialist"}
-                    </p>
+                    <p className="text-xs text-gray-500">{team.designation}</p>
                   </div>
                 </div>
               ))}
@@ -655,41 +787,42 @@ export default function ServiceDetail() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Documents</h3>
-              {(user?.role !== "client" || service.clientId === "client-1") && (
-                <button className="flex items-center px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors">
-                  <Upload className="h-4 w-4 mr-1" />
-                  Upload
-                </button>
-              )}
+              {/* {(user?.role !== "client" || service.clientId === "client-1") && ( */}
+              <button className="flex items-center px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors">
+                <Upload className="h-4 w-4 mr-1" />
+                Upload
+              </button>
+              {/* )} */}
             </div>
 
             <div className="space-y-2">
-              {mockDocuments
-                .filter((doc) => doc.serviceId === service.id)
-                .map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <FileText className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {doc.originalName}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(doc.size / 1024 / 1024).toFixed(1)}MB •{" "}
-                          {formatDistanceToNow(doc.uploadedAt)} ago
-                        </p>
+              {doccuments.length > 0 &&
+                doccuments
+                  .filter((doc) => doc.serviceId === service.serviceId)
+                  .map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <FileText className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {doc.originalName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {(doc.size / 1024 / 1024).toFixed(1)}MB •{" "}
+                            {doc.uploadedAt} ago
+                          </p>
+                        </div>
                       </div>
+                      <button className="p-1 hover:bg-gray-100 rounded">
+                        <Download className="h-4 w-4 text-gray-400" />
+                      </button>
                     </div>
-                    <button className="p-1 hover:bg-gray-100 rounded">
-                      <Download className="h-4 w-4 text-gray-400" />
-                    </button>
-                  </div>
-                ))}
+                  ))}
 
-              {mockDocuments.filter((doc) => doc.serviceId === service.id)
+              {doccuments.filter((doc) => doc.serviceId === service.serviceId)
                 .length === 0 && (
                 <p className="text-sm text-gray-500 text-center py-4">
                   No documents uploaded
@@ -704,44 +837,40 @@ export default function ServiceDetail() {
               Communication
             </h3>
 
-            {/* Comments */}
             <div className="space-y-4 mb-4 max-h-64 overflow-y-auto">
-              {mockComments
-                .filter((comment) => comment.serviceId === service.id)
-                .map((comment) => (
-                  <div key={comment.id} className="space-y-2">
-                    <div className="flex items-start space-x-2">
-                      <img
-                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          comment.authorName
-                        )}&background=0ea5e9&color=fff`}
-                        alt={comment.authorName}
-                        className="h-6 w-6 rounded-full"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <p className="text-sm font-medium text-gray-900">
-                            {comment.authorName}
-                          </p>
-                          {comment.isInternal && (
-                            <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">
-                              Internal
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-700 mt-1">
-                          {comment.content}
+              {comments.map((comment) => (
+                <div key={comment.commentId} className="space-y-2">
+                  <div className="flex items-start space-x-2">
+                    <img
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        comment.authorName
+                      )}&background=0ea5e9&color=fff`}
+                      alt={comment.authorName}
+                      className="h-6 w-6 rounded-full"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <p className="text-sm font-medium text-gray-900">
+                          {comment.authorName}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatDistanceToNow(comment.createdAt)} ago
-                        </p>
+                        {comment.isInternal && (
+                          <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">
+                            Internal
+                          </span>
+                        )}
                       </div>
+                      <p className="text-sm text-gray-700 mt-1">
+                        {comment.commentText}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatDistanceToNow(comment.createdAt)} ago
+                      </p>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
 
-            {/* Add Comment */}
             <form onSubmit={handleCommentSubmit} className="space-y-3">
               <textarea
                 value={newComment}
@@ -772,12 +901,23 @@ export default function ServiceDetail() {
                   className="flex items-center px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   <Send className="h-3 w-3 mr-1" />
-                  Send
+                  {isSaving ? "Sending..." : "Send"}
                 </button>
               </div>
             </form>
           </div>
         </div>
+        <TaskModal
+          open={showTaskModal}
+          onClose={() => setShowTaskModal(false)}
+          staff={staffList || []}
+          serviceName={serviceName}
+          mode={"create"}
+          initialTask={null}
+          onSave={(task) => saveTaskChanges(task, "create")}
+          serviceId={Number(serviceId)}
+          clientId={clientId}
+        />
       </div>
     </div>
   );

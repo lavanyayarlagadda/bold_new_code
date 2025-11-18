@@ -1,5 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -16,6 +18,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+         <ToastContainer position="top-right" autoClose={2000} theme="light" />
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
@@ -61,7 +64,7 @@ function App() {
             </ProtectedRoute>
           } />
           
-          <Route path="/services/:id" element={
+          <Route path="/services/:serviceId" element={
             <ProtectedRoute>
               <Layout>
                 <ServiceDetail />

@@ -31,7 +31,7 @@ export interface Client {
 }
 
 export interface Service {
-  id: string;
+  id: number;
   name: string;
   description: string;
   clientId: string;
