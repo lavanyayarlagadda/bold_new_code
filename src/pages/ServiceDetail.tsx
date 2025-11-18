@@ -634,28 +634,8 @@ export default function ServiceDetail() {
                           {/* // )} */}
 
                           {editingTask === task.taskId ? (
-                            // <input
-                            //   type="date"
-                            //   value={
-                            //     taskDueDates[task.id] ||
-                            //     (task.dueDate
-                            //       ? format(task.dueDate, "yyyy-MM-dd")
-                            //       : "")
-                            //   }
-                            //   onChange={(e) =>
-                            //     setTaskDueDates((prev) => ({
-                            //       ...prev,
-                            //       [task.id]: e.target.value,
-                            //     }))
-                            //   }
-                            //   className="border rounded px-2 py-1 text-sm w-full"
-                            // />
                             <input
                               type="date"
-                              // value={
-                              //   taskDueDates[task.taskId] ||
-                              //   (task.dueDate ? task.dueDate : "")
-                              // }
                               value={task.dueDate ? task.dueDate : ""}
                               onChange={(e) =>
                                 handleTaskDueDate(task.taskId, e.target.value)

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Upload,
   Search,
@@ -18,6 +18,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { mockDocuments, mockServices, mockClients } from "../data/mockData";
 import { format, formatDistanceToNow } from "date-fns";
 import {
+  Client,
+  Status,
   useGetAllClientsQuery,
   useGetAllServicesQuery,
 } from "../redux/services/dropdownApi";
@@ -25,21 +27,40 @@ import {
 export default function Documents() {
   const { user } = useAuth();
 
-  const { data: clientsData, isLoading: clientsLoading } =
-    useGetAllClientsQuery();
-  const { data: statusData, isLoading: statusLoading } =
-    useGetAllServicesQuery();
+  const { data: clientsData } = useGetAllClientsQuery();
+  const { data: statusData } = useGetAllServicesQuery();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
+  // const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [client, setClient] = useState("");
   const [service, setService] = useState("");
- const clients = clientsData?.data || [];
-  const allStatus = statusData?.data || [];
+  const [clientsDataState, setClientsDataState] = useState<Client[]>([]);
+  const [statusDataState, setStatusDataState] = useState<Status[]>([]);
+  const [uploadedFilesList, setUploadedFilesList] = useState<File[]>([]);
+
+  const clients = useMemo(() => clientsData?.data || [], [clientsData]);
+
+  // const Statueses = useMemo(statusData?.data || [];
+  const statuses = useMemo(() => statusData?.data || [], [statusData]);
+
+  console.log("clients", clients);
+
+  useEffect(() => {
+    if (clients?.length) {
+      setClientsDataState(clients);
+    }
+  }, [clients]);
+
+  useEffect(() => {
+    if (statuses?.length) {
+      setStatusDataState(statuses);
+    }
+  }, [statuses]);
+
   const getFilteredDocuments = () => {
     let filtered = mockDocuments;
 
@@ -76,10 +97,6 @@ export default function Documents() {
     } else if (e.type === "dragleave") {
       setDragActive(false);
     }
-    // disable until both selected
-
-    const files = Array.from(e.dataTransfer.files);
-    setUploadingFiles(files);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -101,12 +118,11 @@ export default function Documents() {
 
   const handleFiles = (files: FileList) => {
     const newFiles = Array.from(files);
-    setUploadingFiles((prev) => [...prev, ...newFiles]);
 
     // Simulate upload process
     newFiles.forEach((file, index) => {
       setTimeout(() => {
-        setUploadingFiles((prev) => prev.filter((f) => f !== file));
+        setUploadedFilesList((prev) => [...prev, file]);
         console.log("File uploaded:", file.name);
       }, (index + 1) * 1500);
     });
@@ -132,6 +148,24 @@ export default function Documents() {
 
   const filteredDocuments = getFilteredDocuments();
   const isUploadEnabled = client !== "" && service !== "";
+  const handleSubmitUpload = () => {
+    const payload = {
+      clientId: client,
+      serviceId: service,
+      uploadedFiles: uploadedFilesList,
+    };
+
+    console.log("SUBMIT PAYLOAD:", payload);
+
+    // TODO: Call your API here
+    // uploadDocumentsApi(payload)
+
+    alert("Documents submitted successfully!");
+  };
+
+  const handleDeleteFile = (index: number) => {
+    setUploadedFilesList((prev) => prev.filter((_, i) => i !== index));
+  };
 
   return (
     <div>
@@ -158,14 +192,13 @@ export default function Documents() {
               value={client}
               onChange={(e) => {
                 setClient(e.target.value);
-                setService("");
               }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Select Client</option>
-              {mockClients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+              {clientsDataState.map((c) => (
+                <option key={c.clientId} value={c.clientId}>
+                  {c.clientName}
                 </option>
               ))}
             </select>
@@ -178,21 +211,14 @@ export default function Documents() {
             <select
               value={service}
               onChange={(e) => setService(e.target.value)}
-              disabled={!client}
-              className={`w-full border rounded-lg px-3 py-2 ${
-                client
-                  ? "border-gray-300 focus:ring-2 focus:ring-blue-500"
-                  : "bg-gray-100 text-gray-400"
-              }`}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Select Service</option>
-              {mockServices
-                .filter((s) => s.clientId === client)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
+              {statusDataState.map((s) => (
+                <option key={s.statusId} value={s.statusId}>
+                  {s.statusName}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -246,28 +272,52 @@ export default function Documents() {
             </button>
           </div>
 
-          {/* Upload Progress */}
-          {uploadingFiles.length > 0 && (
-            <div className="mt-4 space-y-2">
-              {uploadingFiles.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-blue-50 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-900">
-                      {file.name}
-                    </span>
+          {uploadedFilesList.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-2">Uploaded Files</h3>
+
+              <div className="space-y-2">
+                {uploadedFilesList.map((file, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded border"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-gray-600" />
+                      <span className="text-sm">{file.name}</span>
+                      <span className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+
+                    <div>
+                      {" "}
+                      <button
+                        onClick={() => handleDeleteFile(i)}
+                        className="text-red-500 text-sm hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-sm text-blue-600">Uploading...</div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
-
+      <button
+        disabled={!client || !service || uploadedFilesList.length === 0}
+        onClick={handleSubmitUpload}
+        className={`mt-4 w-full px-4 py-2 rounded-lg text-white 
+      ${
+        client && service && uploadedFilesList.length
+          ? "bg-green-600 hover:bg-green-700"
+          : "bg-gray-400 cursor-not-allowed"
+      }`}
+      >
+        Submit Upload
+      </button>
       {/* Search and Filters */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
