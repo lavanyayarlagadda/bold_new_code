@@ -146,7 +146,7 @@ export default function ServiceCreation() {
       setTasks((prev) => [...prev, newTask]);
     }
     console.log("existing task update", task);
-
+    setShowTaskModal(false);
     // setShowTaskModal(false);
   };
 
@@ -165,7 +165,7 @@ export default function ServiceCreation() {
           : item
       );
     });
-    setShowTaskModal(false)
+    setShowTaskModal(false);
   };
 
   const getAssignedId = (assignedId: number) => {
