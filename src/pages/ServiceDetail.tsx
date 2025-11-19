@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -25,6 +25,9 @@ import {
   // DeleteIcon,
   // Trash2,
   Edit2,
+  View,
+  Delete,
+  DeleteIcon,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { format, formatDistanceToNow } from "date-fns";
@@ -43,6 +46,13 @@ import {
 import TaskModal from "../components/ReusableComponents/TaskModal";
 import { toast } from "react-toastify";
 import { isKeyObject } from "node:util/types";
+import {
+  useUploadDocumentsMutation,
+  useViewDocumentMutation,
+  useDownloadDocumentMutation,
+  useDeleteDocumentMutation,
+} from "../redux/services/uploadDocumentApi";
+import { ca } from "date-fns/locale";
 interface Task {
   serviceId: number;
   taskId: number;
@@ -55,7 +65,9 @@ interface Task {
   priorityLabel: string;
   statusId?: number;
 }
-
+const getExtension = (url: string) => {
+  return url.split("?")[0].split(".").pop()?.toLowerCase() || "";
+};
 export default function ServiceDetail() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const numericServiceId = serviceId ? Number(serviceId) : undefined;
@@ -71,12 +83,13 @@ export default function ServiceDetail() {
   } = useFetchServiceTaskDetailsQuery(numericServiceId!, {
     skip: !numericServiceId,
   });
-  const [saveComment, { isLoading: isSaving, error: saveError }] =
-    useSaveCommentsMutation();
-  const [
-    createUpdateTasks,
-    { isLoading: iscreateupdatetaskLoading, error: taskCreateUpdateError },
-  ] = useCreateUpdateTaskMutation();
+  const [saveComment, { isLoading: isSaving }] = useSaveCommentsMutation();
+  const [createUpdateTasks, { isLoading: iscreateupdatetaskLoading }] =
+    useCreateUpdateTaskMutation();
+  const [uploadDocuments] = useUploadDocumentsMutation();
+  const [viewDocument] = useViewDocumentMutation();
+  const [downloadDocument] = useDownloadDocumentMutation();
+  const [deleteDocument] = useDeleteDocumentMutation();
 
   const { user } = useAuth();
   const [newComment, setNewComment] = useState("");
@@ -100,18 +113,25 @@ export default function ServiceDetail() {
   const service = serviceInfo;
   // const tasks = tasksList;
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [originalTask, setOriginalTask] = useState<any>(null);
   const [staffList, setStaffList] = useState<SingleUser[]>([]);
   const [serviceName, setServiceName] = useState("");
   console.log("TASKID", tasks, tasksList);
   const clientId = serviceTaskDetails?.data?.serviceInformation?.clientId;
   console.log("clientId", clientId);
-
+  const [dragActive, setDragActive] = useState(false);
   console.log("ActivityTimeline", ActivityTime);
   const { data: statusData } = useGetAllServicesQuery();
   const { data: usersData } = useGetAllUsersQuery();
   const allStatus = statusData?.data || [];
   const allUsers = usersData?.data || [];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFilesList, setUploadedFilesList] = useState<File[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const userId = user?.userId || 2;
   useEffect(() => {
     if (serviceInfo) {
       const service = serviceInfo.serviceName;
@@ -150,18 +170,11 @@ export default function ServiceDetail() {
   console.log("serviceDetails", serviceTaskDetails);
   const handleTaskStatusChange = (taskId: number, statusId: number | null) => {
     console.log(`Task ${taskId} changed to status: ${statusId}`);
-    // setTaskStatuses((prev) => ({
-    //   ...prev,
-    //   [taskId]: newStatus,
-    // }));
+
     updateTaskField(taskId, "statusId", statusId);
   };
 
   const handleTaskAssignment = (taskId: number, assignedId: number | "") => {
-    // setTaskAssignments((prev) => ({
-    //   ...prev,
-    //   [taskId]: assigneeId,
-    // }));
     console.log("handleTaskAssignment", taskId, assignedId);
     updateTaskField(taskId, "assignedId", assignedId);
   };
@@ -220,8 +233,13 @@ export default function ServiceDetail() {
 
   const cancelTaskEdit = (taskId: number) => {
     console.log("iddd", taskId);
-
+ setTasks((prev) =>
+    prev.map((t) =>
+      t.taskId === taskId ? originalTask : t
+    )
+  );
     setEditingTask(null);
+     setOriginalTask(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -313,6 +331,140 @@ export default function ServiceDetail() {
     }, 1000);
   };
 
+  const handleFiles = (files: FileList) => {
+    const newFiles = Array.from(files);
+
+    // Simulate upload process
+    newFiles.forEach((file, index) => {
+      setTimeout(() => {
+        setUploadedFilesList((prev) => [...prev, file]);
+        console.log("File uploaded:", file.name);
+      }, (index + 1) * 1500);
+    });
+  };
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleFiles(e.target.files);
+    }
+  };
+
+  const handleDeleteFile = (index: number) => {
+    setUploadedFilesList((prev) => prev.filter((_, i) => i !== index));
+  };
+  const handleSubmitUpload = async () => {
+    if (uploadedFilesList.length === 0) {
+      toast.error("Please select at least one file");
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("clientId", clientId ? String(clientId) : "");
+    formData.append("serviceId", serviceId ? String(serviceId) : "");
+    formData.append("userId", String(userId));
+
+    uploadedFilesList.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    try {
+      const res = await uploadDocuments(formData).unwrap();
+      toast.success("Files uploaded successfully!");
+
+      // clear files after upload
+      setUploadedFilesList([]);
+      refetchServiceTaskDetails();
+      console.log("UPLOAD RESPONSE:", res);
+    } catch (err) {
+      console.error("UPLOAD ERROR:", err);
+      toast.error("Failed to upload documents");
+    }
+  };
+
+  const documentView = async (doc: any) => {
+    try {
+      const fileUrl = doc.documentId;
+
+      const res = await viewDocument(fileUrl).unwrap();
+
+      console.log("viewresponse", res);
+
+      if (res?.url) {
+        setPreviewUrl(res.url);
+        setPreviewOpen(true);
+      } else {
+        toast.error("Failed to get document URL");
+      }
+    } catch (err) {
+      console.error("VIEW ERROR:", err);
+      toast.error("Failed to view document");
+    }
+  };
+
+  const documentDownload = async (doc: any) => {
+    try {
+      const fileUrl = doc.documentId;
+
+      // res is a Blob now
+      const blob = await downloadDocument(fileUrl).unwrap();
+
+      // Create downloadable URL
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      // Extract filename if needed
+      const filename = doc.documentName || "downloaded-file";
+
+      // Create <a> download link
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("DOWNLOAD ERROR:", error);
+      toast.error("Failed to download document");
+    }
+  };
+
+  const documentDelete = async (doc: any) => {
+    try {
+      const documentId = doc.documentId;
+      const res = await deleteDocument({
+        documentId: documentId,
+        userId: userId,
+      }).unwrap();
+      console.log("deleteresponse", res);
+      toast.success("Document deleted successfully");
+      refetchServiceTaskDetails();
+    } catch (error) {
+      console.error("DELETE ERROR:", error);
+      toast.error("Failed to delete document");
+    }
+  };
   return (
     <div className="max-w-6xl mx-auto">
       {/* Header */}
@@ -503,7 +655,10 @@ export default function ServiceDetail() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <select
+                        {task.status && editingTask !== task.taskId && (
+                          <span>{task.status}</span>
+                        )}
+                        {/* <select
                           value={task.statusId || ""}
                           onChange={(e) =>
                             handleTaskStatusChange(
@@ -522,48 +677,12 @@ export default function ServiceDetail() {
                               {option.statusName}
                             </option>
                           ))}
-                        </select>
-                        {
-                          // (user?.role === "admin" || user?.role === "staff") &&
-                          // isEditService && (
-                          //   // editingTask !== task.taskId && (
-                          //   <button
-                          //     onClick={() => {
-                          //       setEditingTask(task.taskId);
-                          //       setTaskAssignments((prev) => ({
-                          //         ...prev,
-                          //         [task.taskId]: task.assigneeName || "",
-                          //       }));
-                          //       setTaskDueDates((prev) => ({
-                          //         ...prev,
-                          //         [task.taskId]: task.dueDate
-                          //           ? format(task.dueDate, "yyyy-MM-dd")
-                          //           : "",
-                          //       }));
-                          //     }}
-                          //     className="p-1 text-red-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                          //     title="Edit assignment and due date"
-                          //   >
-                          //     <Trash2 className="h-3 w-3" />
-                          //   </button>
-                          // )
-                          // )
-                        }
-                        {/* <button
-                          onClick={() => handleTaskToggle(task.taskId)}
-                          className="p-1 hover:bg-gray-100 rounded"
-                        >
-                          {expandedTasks.includes(task.taskId) ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </button> */}
+                        </select> */}
                       </div>
                     </div>
 
                     {/* {expandedTasks.includes(task.taskId) && ( */}
-                    {isEditService && (
+                    {isEditService &&  (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-gray-600 font-medium">
@@ -573,12 +692,13 @@ export default function ServiceDetail() {
                             className="text-gray-500 hover:text-blue-600 cursor-pointer h-4 w-4"
                             onClick={() => {
                               // setIsTaskDetailsEditable(true);
+                                 setOriginalTask({ ...task });
                               setEditingTask(task.taskId);
                             }}
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                           {/* <div>
                         
                           {task.isRequired && (
@@ -633,6 +753,29 @@ export default function ServiceDetail() {
 
                           {/* // )} */}
 
+                          {editingTask === task.taskId && (
+                            <select
+                              value={task.statusId || ""}
+                              onChange={(e) =>
+                                handleTaskStatusChange(
+                                  task.taskId,
+                                  e.target.value ? Number(e.target.value) : null
+                                )
+                              }
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              {" "}
+                              {allStatus.map((option) => (
+                                <option
+                                  key={option.statusId}
+                                  value={option.statusId}
+                                >
+                                  {option.statusName}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
                           {editingTask === task.taskId ? (
                             <input
                               type="date"
@@ -648,7 +791,7 @@ export default function ServiceDetail() {
                             </p>
                           )}
 
-                          {editingTask && (
+                          {editingTask && editingTask === task.taskId && (
                             <div className="flex items-center space-x-2  float-end">
                               <button
                                 onClick={() => saveTaskChanges(task, "update")}
@@ -764,50 +907,136 @@ export default function ServiceDetail() {
           </div>
 
           {/* Documents */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 ">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Documents</h3>
               {/* {(user?.role !== "client" || service.clientId === "client-1") && ( */}
-              <button className="flex items-center px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors">
-                <Upload className="h-4 w-4 mr-1" />
+              {/* <button className="flex items-center px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors">
+                <Upload className="h-4 w-4 mr-1" onClick={() => fileInputRef.current?.click()}/>
                 Upload
-              </button>
-              {/* )} */}
+              </button> */}
+              <div
+                // className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                //   dragActive
+                //     ? "border-blue-500 bg-blue-50"
+                //     : "border-gray-300 hover:border-gray-400"
+                // }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileInput}
+                  className="hidden"
+                />
+                {/* <Upload className={"h-12 w-12 mx-auto mb- text-gray-300"} />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Upload Documents
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Select Client and Service first
+                </p> */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`inline-flex items-center px-4 py-1 rounded-lg transition-colors 
+                  bg-blue-600 text-white hover:bg-blue-700"
+                     
+                  }`}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Upload Files
+                </button>
+              </div>
             </div>
+            <div className="space-y-4 mb-4 max-h-64 overflow-y-auto">
+              {uploadedFilesList.length > 0 && (
+                <>
+                  <div className="mt-4 space-y-2">
+                    <h4 className="font-medium text-gray-700">
+                      Files to Upload
+                    </h4>
 
-            <div className="space-y-2">
-              {doccuments.length > 0 &&
-                doccuments
-                  .filter((doc) => doc.serviceId === service.serviceId)
-                  .map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {doc.originalName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {(doc.size / 1024 / 1024).toFixed(1)}MB •{" "}
-                            {doc.uploadedAt} ago
-                          </p>
+                    {uploadedFilesList.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between bg-gray-50 p-2 rounded border"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-gray-600" />
+                          <span className="text-sm">{file.name}</span>
+                          <span className="text-xs text-gray-500">
+                            {(file.size / 1024).toFixed(1)} KB
+                          </span>
                         </div>
-                      </div>
-                      <button className="p-1 hover:bg-gray-100 rounded">
-                        <Download className="h-4 w-4 text-gray-400" />
-                      </button>
-                    </div>
-                  ))}
 
-              {doccuments.filter((doc) => doc.serviceId === service.serviceId)
-                .length === 0 && (
-                <p className="text-sm text-gray-500 text-center py-4">
-                  No documents uploaded
-                </p>
+                        <button
+                          onClick={() => handleDeleteFile(index)}
+                          className="text-red-500 text-sm hover:underline"
+                        >
+                          <DeleteIcon/>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleSubmitUpload}
+                    className={
+                      "inline-flex items-center px-4 py-1 mt-2 rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                    }
+                  >
+                    Submit
+                  </button>
+                </>
               )}
+              <div className="space-y-2">
+                {doccuments.length > 0 &&
+                  doccuments
+                    .filter((doc) => doc.serviceId === service.serviceId)
+                    .map((doc) => (
+                      <div
+                        key={doc.documentId}
+                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-gray-400" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {doc.file_name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {/* {(doc.size / 1024 / 1024).toFixed(1)}MB •{" "} */}
+                              {doc.file_size} •{doc.created_duration}
+                            </p>
+                          </div>
+                        </div>
+                        <button className="p-1 hover:bg-gray-100 rounded flex">
+                          <View
+                            className="h-4 w-4 text-gray-400 "
+                            onClick={() => documentView(doc)}
+                          />
+                          <Download
+                            className="h-4 w-4 text-gray-400 ml-2"
+                            onClick={() => documentDownload(doc)}
+                          />
+                          <Delete
+                            className="h-4 w-4 text-red-500 ml-2"
+                            onClick={() => documentDelete(doc)}
+                          />
+                        </button>
+                      </div>
+                    ))}
+
+                {doccuments.filter((doc) => doc.serviceId === service.serviceId)
+                  .length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-4">
+                    No documents uploaded
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -898,6 +1127,76 @@ export default function ServiceDetail() {
           serviceId={Number(serviceId)}
           clientId={clientId}
         />
+
+        {previewOpen && previewUrl && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white w-[90%] h-[85vh] rounded-lg shadow-xl p-4 relative">
+              {/* Close Button */}
+              <button
+                onClick={() => setPreviewOpen(false)}
+                className="  right-3 text-white hover:text-black text-sm float-right rounded-full px-2 py-1 bg-blue-500 hover:bg-gray-200 transition-colors"
+              >
+                ✕
+              </button>
+
+              {/* Viewer */}
+              <div className="w-full h-full top-3">
+                {(() => {
+                  const ext = getExtension(previewUrl);
+
+                  // PDF VIEWER
+                  if (ext === "pdf") {
+                    return (
+                      <iframe
+                        src={previewUrl}
+                        className="w-full h-full border-none"
+                      />
+                    );
+                  }
+
+                  // IMAGE VIEWER
+                  if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
+                    return (
+                      <img
+                        src={previewUrl}
+                        className="w-full h-full object-contain"
+                      />
+                    );
+                  }
+
+                  // OFFICE DOCUMENTS (Word / Excel / PPT)
+                  if (
+                    ["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext)
+                  ) {
+                    return (
+                      <iframe
+                        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(
+                          previewUrl
+                        )}`}
+                        className="w-full h-full border-none"
+                      />
+                    );
+                  }
+
+                  // TEXT FILES
+                  if (ext === "txt") {
+                    return (
+                      <iframe
+                        src={previewUrl}
+                        className="w-full h-full border-none"
+                      />
+                    );
+                  }
+
+                  // FALLBACK
+                  return (
+                    <p className="text-center mt-10">No preview available</p>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
