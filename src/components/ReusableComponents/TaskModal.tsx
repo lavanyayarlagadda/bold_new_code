@@ -315,8 +315,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
               {staff.map((member) => (
                 <option key={member.userId} value={member.userId}>
-                  {member.fullName} ({member.role.roleName} –{" "}
-                  {member.client.clientName})
+                  {member.fullName} 
+                  
                 </option>
               ))}
             </select>

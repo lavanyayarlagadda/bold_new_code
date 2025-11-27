@@ -97,6 +97,15 @@ export const serviceTasksApi = createApi({
   reducerPath: "serviceTasksApi",
   baseQuery: fetchBaseQuery({
     baseUrl: "http://localhost:8181/",
+      prepareHeaders: (headers) => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    return headers;
+  },
   }),
   endpoints: (builder) => ({
     fetchServiceTasks: builder.mutation<

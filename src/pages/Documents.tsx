@@ -50,7 +50,7 @@
 //   const statuses = useMemo(() => statusData?.data || [], [statusData]);
 
 //   const [uploadDocuments] = useUploadDocumentsMutation();
- 
+
 // const [files, setFiles] = useState<File[]>([]);
 // const userId = 2
 
@@ -62,8 +62,8 @@
 // const handleUpload = async () => {
 //   const formData = new FormData();
 
-//   formData.append("serviceId", service);   
-//   formData.append("userId", userId.toString());         
+//   formData.append("serviceId", service);
+//   formData.append("userId", userId.toString());
 
 //   files.forEach((file) => {
 //     formData.append("documents", file); // backend expects "documents"
@@ -339,7 +339,7 @@
 //       <button
 //         disabled={!client || !service || uploadedFilesList.length === 0}
 //         onClick={handleSubmitUpload}
-//         className={`mt-4 w-full px-4 py-2 rounded-lg text-white 
+//         className={`mt-4 w-full px-4 py-2 rounded-lg text-white
 //       ${
 //         client && service && uploadedFilesList.length
 //           ? "bg-green-600 hover:bg-green-700"
@@ -531,7 +531,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDocuments, mockServices, mockClients } from "../data/mockData";
+import { mockDocuments } from "../data/mockData";
 import { formatDistanceToNow } from "date-fns";
 import {
   Client,
@@ -542,12 +542,15 @@ import {
 
 import { useUploadDocumentsMutation } from "../redux/services/uploadDocumentApi";
 import { toast } from "react-toastify";
+import { useFetchServiceTasksMutation } from "../redux/services/serviceTasksApi";
 
 export default function Documents() {
   const { user } = useAuth();
 
   const { data: clientsData } = useGetAllClientsQuery();
   const { data: statusData } = useGetAllServicesQuery();
+  const [fetchServiceTasks, { data, isLoading, error }] =
+    useFetchServiceTasksMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [serviceFilter, setServiceFilter] = useState("all");
@@ -562,13 +565,29 @@ export default function Documents() {
   const [clientsDataState, setClientsDataState] = useState<Client[]>([]);
   const [statusDataState, setStatusDataState] = useState<Status[]>([]);
   const [uploadedFilesList, setUploadedFilesList] = useState<File[]>([]);
+ const [servicesDataState, setServicesDataState] = useState<any[]>([]);
 
   const [uploadDocuments, { isLoading: isUploading }] =
     useUploadDocumentsMutation();
 
-  const userId = user?.userId || 2;
+  const userId = user?.userId || 0;
+  useEffect(() => {
+    fetchServiceTasks({
+      // serviceName: "",
+      // serviceType: "",
+      // clientName: selectedClient || "",
+      // statusName: selectedStatus || "",
+      serviceTemplateId: 0,
+      clientId: 0,
+      statusId: 0,
+    });
+  }, [fetchServiceTasks]);
+useEffect(() => {
+  if (data?.data) {
+    setServicesDataState(data.data);   
+  }
+}, [data]);
 
-  // Load client & service dropdown data
   useEffect(() => {
     if (clientsData?.data) setClientsDataState(clientsData.data);
   }, [clientsData]);
@@ -703,19 +722,21 @@ export default function Documents() {
               className="w-full border px-3 py-2 rounded"
             >
               <option value="">Select Service</option>
-              {statusDataState.map((s) => (
-                <option key={s.statusId} value={s.statusId}>
-                  {s.statusName}
+
+              {servicesDataState.map((srv: any) => (
+                <option key={srv.serviceId} value={srv.serviceId}>
+                  {srv.serviceName}
                 </option>
               ))}
             </select>
           </div>
+          <button className="mt-4 w-full bg-green-600 text-white py-2 rounded disabled:bg-gray-400">Search documents</button>
         </div>
 
         {/* Right Upload Section */}
         <div className="w-2/3">
           <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center ${
+            className={`border-2 border-dashed rounded-lg p-3 text-center ${
               isUploadEnabled ? "bg-white" : "bg-gray-100 opacity-50"
             }`}
             onDragEnter={handleDrag}

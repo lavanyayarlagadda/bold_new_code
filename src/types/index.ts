@@ -1,11 +1,13 @@
 export type UserRole = 'admin' | 'staff' | 'partner' | 'client';
 
 export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  organizationId: string;
+  userId?: number;
+  email?: string;
+  name?: string;
+  role?: UserRole;
+  roleId?:number;
+  clientId?:number;
+  organizationId?: string;
   avatar?: string;
   isOnboarded?: boolean;
 }

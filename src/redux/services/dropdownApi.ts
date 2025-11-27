@@ -81,13 +81,13 @@ export interface TaskFormData {
   assigneeId: number | null;
   dueDate: string;
   taskTemplateId: number | null;
-  taskId?:number | null
-  serviceId?:number | null;
-  clientId?:number| null;
-  statusId?:number | null
-  createdBy?:string;
-  updatedBy?:string;
-  assignedId?:number | null
+  taskId?: number | null;
+  serviceId?: number | null;
+  clientId?: number | null;
+  statusId?: number | null;
+  createdBy?: string;
+  updatedBy?: string;
+  assignedId?: number | null;
 }
 
 export interface ServiceTemplate {
@@ -112,6 +112,15 @@ export const dropdownApi = createApi({
   reducerPath: "dropdownApi",
   baseQuery: fetchBaseQuery({
     baseUrl: "http://localhost:8181/",
+    prepareHeaders: (headers) => {
+      const token = localStorage.getItem("token");
+
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      return headers;
+    },
   }),
   endpoints: (builder) => ({
     getServiceStatuses: builder.query({

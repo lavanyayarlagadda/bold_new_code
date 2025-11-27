@@ -4,6 +4,15 @@ export const uploadDocumentApi = createApi({
   reducerPath: "uploadDocumentApi",
   baseQuery: fetchBaseQuery({
     baseUrl: "http://localhost:8181/",
+    prepareHeaders: (headers) => {
+      const token = localStorage.getItem("token");
+
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      return headers;
+    },
   }),
 
   endpoints: (builder) => ({

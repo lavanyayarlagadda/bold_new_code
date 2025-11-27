@@ -533,7 +533,7 @@ export default function Services() {
 
   const clients = clientsData?.data || [];
   const allStatus = statusData?.data || [];
-
+  console.log("user123", user);
   // Fetch API Data
   useEffect(() => {
     fetchServiceTasks({
@@ -542,7 +542,11 @@ export default function Services() {
       // clientName: selectedClient || "",
       // statusName: selectedStatus || "",
       serviceTemplateId: 0,
-      clientId: Number(selectedClient) || 0,
+      clientId: selectedClient
+        ? Number(selectedClient)
+        : user?.clientId
+        ? user.clientId
+        : 0,
       statusId: Number(selectedStatus) || 0,
     });
   }, [fetchServiceTasks, selectedClient, selectedStatus]);
@@ -556,9 +560,11 @@ export default function Services() {
     let filtered = [...servicesData];
 
     if (user?.role === "client") {
-      filtered = filtered.filter((s) => s.clientName === user.id);
+      filtered = filtered.filter((s) => s.clientName === String(user?.userId));
     } else if (user?.role === "staff" || user?.role === "partner") {
-      filtered = filtered.filter((s) => s.assignedTo?.includes(user.id));
+      filtered = filtered.filter((s) =>
+        s.assignedTo?.includes(String(user?.userId))
+      );
     }
 
     if (searchQuery.trim()) {
@@ -835,6 +841,7 @@ export default function Services() {
     );
   };
 
+  console.log(user, "user deails");
   const handleClear = () => {
     dispatch(setSelectedClient("all"));
     dispatch(setSelectedStatus("all"));
@@ -845,13 +852,8 @@ export default function Services() {
 
     setTimeout(() => {
       fetchServiceTasks({
-        // serviceName: "",
-        // serviceType: "",
-        // clientName: "",
-        // statusName: "",
-
         serviceTemplateId: 0,
-        clientId: 0,
+        clientId: user?.clientId ? user.clientId : 0,
         statusId: 0,
       });
     }, 0);
@@ -870,15 +872,15 @@ export default function Services() {
             Manage your services and track progress
           </p>
         </div>
-        {(user?.role === "admin" || user?.role === "staff") && (
-          <Link
-            to="/services/new"
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mt-4 sm:mt-0"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Service
-          </Link>
-        )}
+        {/* {(user?.role === "admin" || user?.role === "staff") && ( */}
+        <Link
+          to="/services/new"
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mt-4 sm:mt-0"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Service
+        </Link>
+        {/* )} */}
       </div>
 
       {/* Filters */}
@@ -959,29 +961,29 @@ export default function Services() {
                   </option>
                 ))}
             </select>
-
-            {(user?.role === "admin" || user?.role === "staff") && (
-              <select
-                value={clientFilter}
-                // onChange={(e) => setClientFilter(e.target.value)}
-                onChange={(e) => (
-                  setClientFilter(e.target.value),
-                  dispatch(setSelectedClient(e.target.value))
-                )}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">
-                  {" "}
-                  {clientsLoading ? "Loading..." : "All Clients"}
-                </option>
-                {!clientsLoading &&
-                  clients.map((client) => (
-                    <option key={client.clientId} value={client.clientId}>
-                      {client.clientName}
-                    </option>
-                  ))}
-              </select>
-            )}
+            {/* 
+            {(user?.role === "admin" || user?.role === "staff") && ( */}
+            <select
+              value={clientFilter}
+              // onChange={(e) => setClientFilter(e.target.value)}
+              onChange={(e) => (
+                setClientFilter(e.target.value),
+                dispatch(setSelectedClient(e.target.value))
+              )}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">
+                {" "}
+                {clientsLoading ? "Loading..." : "All Clients"}
+              </option>
+              {!clientsLoading &&
+                clients.map((client) => (
+                  <option key={client.clientId} value={client.clientId}>
+                    {client.clientName}
+                  </option>
+                ))}
+            </select>
+            {/* // )} */}
 
             {/* <select
               value={serviceTypeFilter}
@@ -1019,16 +1021,15 @@ export default function Services() {
               ? "Try adjusting your search or filters"
               : "Get started by creating your first service"}
           </p>
-          {(user?.role === "admin" || user?.role === "staff") &&
-            !searchQuery && (
-              <Link
-                to="/services/new"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Service
-              </Link>
-            )}
+          {!searchQuery && (
+            <Link
+              to="/services/new"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Service
+            </Link>
+          )}
         </div>
       ) : viewMode === "grid" ? (
         // <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

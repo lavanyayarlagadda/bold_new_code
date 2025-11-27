@@ -32,6 +32,7 @@ import {
   useGetTasksByServiceTemplateMutation,
 } from "../redux/services/serviceTasksApi";
 import { toast } from "react-toastify";
+import { useAuth } from "../contexts/AuthContext";
 
 // Mock staff/partner data
 
@@ -74,7 +75,7 @@ export default function ServiceCreation() {
   const [tasks, setTasks] = useState<TaskFormData[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [tasksDatafromDropdownData, setTasksDatafromDropdownData] = useState();
-
+ const { user } = useAuth();
   useEffect(() => {
     if (tasksDatafromDropdown && tasksDatafromDropdown.data?.length > 0) {
       setTasksDatafromDropdownData(tasksDatafromDropdown.data);
@@ -99,7 +100,8 @@ export default function ServiceCreation() {
     : null;
 
   const handleTemplateSelect = async (template: ServiceTemplate) => {
-    console.log("templateId", template);
+    console.log("template", template);
+    console.log("templates", templates)
 
     const templateObj = templates.find(
       (t: ServiceTemplate) => t.serviceTemplateId === template.serviceTemplateId
@@ -221,7 +223,7 @@ export default function ServiceCreation() {
       templateType: isCustomService ? "Custom" : "Existing",
       serviceTemplateId: !isCustomService ? selectedTemplate : null,
       clientId: selectedClient,
-      userId: 2,
+      userId: user?.userId,
       // name: serviceName,
       assignedUsers: selectedStaff,
       priorityId: priority,
@@ -521,9 +523,9 @@ export default function ServiceCreation() {
                                     <p className="font-medium text-gray-900">
                                       {staff.fullName}
                                     </p>
-                                    <p className="text-sm text-gray-500">
+                                    {/* <p className="text-sm text-gray-500">
                                       {staff.role.roleName}
-                                    </p>
+                                    </p> */}
                                   </div>
                                 </div>
                                 {selectedStaff.includes(staff.userId) && (
@@ -572,7 +574,7 @@ export default function ServiceCreation() {
 
                 <div className="w-full md:w-2/4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Due Date
+                    Due Date *
                   </label>
                   <input
                     type="date"

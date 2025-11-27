@@ -30,7 +30,7 @@ import {
   DeleteIcon,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import ActivityTimeline from "../components/ActivityTimeline";
 import {
   useFetchServiceTaskDetailsQuery,
@@ -131,7 +131,7 @@ export default function ServiceDetail() {
 
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const userId = user?.userId || 2;
+  const userId = user?.userId || 0;
   useEffect(() => {
     if (serviceInfo) {
       const service = serviceInfo.serviceName;
@@ -194,14 +194,14 @@ export default function ServiceDetail() {
     mode: "create" | "update"
   ) => {
     console.log("taskedit", task);
-    let payload: any = {
+    const payload = {
       taskId: task.taskId || 0,
       serviceId: Number(task.serviceId),
       clientId: Number(clientId),
       taskName: task.taskName,
       dueDate: task.dueDate,
       taskDescription: task.taskDescription,
-      // assigneeId: Number(task.assignedId),
+      assigneeId: Number(task.assignedId),
       statusId: Number(task.statusId),
       createdBy: 2,
       updatedBy: 2,
@@ -233,13 +233,11 @@ export default function ServiceDetail() {
 
   const cancelTaskEdit = (taskId: number) => {
     console.log("iddd", taskId);
- setTasks((prev) =>
-    prev.map((t) =>
-      t.taskId === taskId ? originalTask : t
-    )
-  );
+    setTasks((prev) =>
+      prev.map((t) => (t.taskId === taskId ? originalTask : t))
+    );
     setEditingTask(null);
-     setOriginalTask(null);
+    setOriginalTask(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -296,7 +294,7 @@ export default function ServiceDetail() {
     // setNewComment("");
     try {
       const payload = {
-        userId: 2,
+        userId: user?.userId ?? 0, 
         clientId: clientId ?? 0,
         serviceId: Number(serviceId),
         message: newComment,
@@ -483,15 +481,15 @@ export default function ServiceDetail() {
             <p className="text-gray-600">{service?.clientName}</p>
           </div>
         </div>
-        {(user?.role === "admin" || user?.role === "staff") && (
-          <button
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            onClick={() => setIsEditService(true)}
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Service
-          </button>
-        )}
+        {/* {(user?.role === "admin" || user?.role === "staff") && ( */}
+        <button
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          onClick={() => setIsEditService(true)}
+        >
+          <Edit className="h-4 w-4 mr-2" />
+          Edit Service
+        </button>
+        {/* // )} */}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -602,16 +600,15 @@ export default function ServiceDetail() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
-                {(user?.role === "admin" || user?.role === "staff") &&
-                  isEditService && (
-                    <button
-                      className="flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                      onClick={() => setShowTaskModal(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Task
-                    </button>
-                  )}
+                {isEditService && (
+                  <button
+                    className="flex items-center px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                    onClick={() => setShowTaskModal(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Task
+                  </button>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -682,7 +679,7 @@ export default function ServiceDetail() {
                     </div>
 
                     {/* {expandedTasks.includes(task.taskId) && ( */}
-                    {isEditService &&  (
+                    {isEditService && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-gray-600 font-medium">
@@ -692,7 +689,7 @@ export default function ServiceDetail() {
                             className="text-gray-500 hover:text-blue-600 cursor-pointer h-4 w-4"
                             onClick={() => {
                               // setIsTaskDetailsEditable(true);
-                                 setOriginalTask({ ...task });
+                              setOriginalTask({ ...task });
                               setEditingTask(task.taskId);
                             }}
                           />
@@ -736,7 +733,8 @@ export default function ServiceDetail() {
                               <option value="">Unassigned</option>
                               {allUsers.map((user) => (
                                 <option key={user.userId} value={user.userId}>
-                                  {user.fullName} ({user.role.roleName})
+                                  {user.fullName}
+                                  {/* ({user.role.roleName}) */}
                                 </option>
                               ))}
                             </select>
@@ -977,7 +975,7 @@ export default function ServiceDetail() {
                           onClick={() => handleDeleteFile(index)}
                           className="text-red-500 text-sm hover:underline"
                         >
-                          <DeleteIcon/>
+                          <DeleteIcon />
                         </button>
                       </div>
                     ))}

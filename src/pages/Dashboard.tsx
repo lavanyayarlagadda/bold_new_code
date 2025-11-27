@@ -1,60 +1,79 @@
-import React from 'react';
-import { 
-  TrendingUp, 
-  Users, 
-  FolderOpen, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
+import React, { useEffect } from "react";
+import {
+  TrendingUp,
+  Users,
+  FolderOpen,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
   FileText,
   Plus,
   UserPlus,
   Calendar,
-  Target
-} from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { mockDashboardStats, mockServices, mockClients } from '../data/mockData';
-import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
-
+  Eye,
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  mockDashboardStats,
+  mockServices,
+  mockClients,
+} from "../data/mockData";
+import { Link } from "react-router-dom";
+import { format } from "date-fns";
+import {
+  ServiceTask,
+  useFetchServiceTasksMutation,
+} from "../redux/services/serviceTasksApi";
+import TableWithPagination from "../components/TableWithPagination";
 export default function Dashboard() {
   const { user } = useAuth();
-  const stats = mockDashboardStats[user?.role || 'client'];
+  const stats = mockDashboardStats[user?.role || "client"];
+  const [fetchServiceTasks, { data, isLoading, error }] =
+    useFetchServiceTasksMutation();
 
   const getRecentServices = () => {
-    if (user?.role === 'client') {
-      return mockServices.filter(s => s.clientId === 'client-1').slice(0, 3);
+    if (user?.role === "client") {
+      return mockServices.filter((s) => s.clientId === "client-1").slice(0, 3);
     }
     return mockServices.slice(0, 5);
   };
 
+  const servicesData = Array.isArray(data?.data) ? data.data.slice(0, 5) : [];
+
+  console.log("servicesData", servicesData);
   const getUpcomingTasks = () => {
-    const allTasks = mockServices.flatMap(service => 
-      service.tasks.map(task => ({
+    const allTasks = mockServices.flatMap((service) =>
+      service.tasks.map((task) => ({
         ...task,
         serviceName: service.name,
-        clientName: mockClients.find(c => c.id === service.clientId)?.name || 'Unknown Client'
+        clientName:
+          mockClients.find((c) => c.id === service.clientId)?.name ||
+          "Unknown Client",
       }))
     );
-    
+
     return allTasks
-      .filter(task => task.status !== 'completed')
-      .sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime())
+      .filter((task) => task.status !== "completed")
+      .sort(
+        (a, b) =>
+          new Date(a.dueDate || 0).getTime() -
+          new Date(b.dueDate || 0).getTime()
+      )
       .slice(0, 5);
   };
 
-  const StatCard = ({ 
-    title, 
-    value, 
-    icon: Icon, 
-    color, 
-    trend 
-  }: { 
-    title: string; 
-    value: number; 
-    icon: React.ElementType; 
-    color: string; 
-    trend?: string; 
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    color,
+    trend,
+  }: {
+    title: string;
+    value: number;
+    icon: React.ElementType;
+    color: string;
+    trend?: string;
   }) => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between">
@@ -110,7 +129,9 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Quick Actions
+        </h2>
         <div className="flex flex-wrap gap-3">
           <Link
             to="/services/new"
@@ -172,8 +193,8 @@ export default function Dashboard() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">My Tasks</h2>
-          <Link 
-            to="/services" 
+          <Link
+            to="/services"
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
             View all →
@@ -181,22 +202,31 @@ export default function Dashboard() {
         </div>
         <div className="space-y-3">
           {getUpcomingTasks().map((task) => (
-            <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+            <div
+              key={task.id}
+              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            >
               <div className="flex-1">
                 <h4 className="font-medium text-gray-900">{task.title}</h4>
-                <p className="text-sm text-gray-600">{task.serviceName} • {task.clientName}</p>
+                <p className="text-sm text-gray-600">
+                  {task.serviceName} • {task.clientName}
+                </p>
               </div>
               <div className="flex items-center space-x-3">
-                <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                  task.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                  task.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
-                  {task.status.replace('_', ' ')}
+                <span
+                  className={`px-2 py-1 text-xs rounded-full font-medium ${
+                    task.status === "in_progress"
+                      ? "bg-blue-100 text-blue-700"
+                      : task.status === "pending"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {task.status.replace("_", " ")}
                 </span>
                 {task.dueDate && (
                   <span className="text-xs text-gray-500">
-                    Due {format(task.dueDate, 'MMM d')}
+                    Due {format(task.dueDate, "MMM d")}
                   </span>
                 )}
               </div>
@@ -240,14 +270,19 @@ export default function Dashboard() {
       {/* Service Types Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Services by Type</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Services by Type
+          </h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-gray-600">Accounting</span>
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-medium">2 active</span>
                 <div className="w-16 bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{width: '75%'}}></div>
+                  <div
+                    className="bg-blue-500 h-2 rounded-full"
+                    style={{ width: "75%" }}
+                  ></div>
                 </div>
               </div>
             </div>
@@ -256,7 +291,10 @@ export default function Dashboard() {
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-medium">1 overdue</span>
                 <div className="w-16 bg-gray-200 rounded-full h-2">
-                  <div className="bg-red-500 h-2 rounded-full" style={{width: '40%'}}></div>
+                  <div
+                    className="bg-red-500 h-2 rounded-full"
+                    style={{ width: "40%" }}
+                  ></div>
                 </div>
               </div>
             </div>
@@ -265,7 +303,10 @@ export default function Dashboard() {
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-medium">1 in review</span>
                 <div className="w-16 bg-gray-200 rounded-full h-2">
-                  <div className="bg-yellow-500 h-2 rounded-full" style={{width: '90%'}}></div>
+                  <div
+                    className="bg-yellow-500 h-2 rounded-full"
+                    style={{ width: "90%" }}
+                  ></div>
                 </div>
               </div>
             </div>
@@ -273,26 +314,34 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Notifications</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Recent Notifications
+          </h3>
           <div className="space-y-3">
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
               <div className="flex-1">
-                <p className="text-sm text-gray-900">Additional receipts needed for January expense categorization</p>
+                <p className="text-sm text-gray-900">
+                  Additional receipts needed for January expense categorization
+                </p>
                 <p className="text-xs text-gray-500">2 hours ago</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
               <div className="flex-1">
-                <p className="text-sm text-gray-900">Bank reconciliation completed for January 2024</p>
+                <p className="text-sm text-gray-900">
+                  Bank reconciliation completed for January 2024
+                </p>
                 <p className="text-xs text-gray-500">1 day ago</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
               <div className="flex-1">
-                <p className="text-sm text-gray-900">GST return Q4 2023 ready for review</p>
+                <p className="text-sm text-gray-900">
+                  GST return Q4 2023 ready for review
+                </p>
                 <p className="text-xs text-gray-500">3 days ago</p>
               </div>
             </div>
@@ -302,6 +351,84 @@ export default function Dashboard() {
     </>
   );
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-100 text-green-700";
+      case "in_progress":
+        return "bg-blue-100 text-blue-700";
+      case "review":
+        return "bg-yellow-100 text-yellow-700";
+      case "overdue":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+  const ServiceRow = ({ service }: { service: ServiceTask }) => {
+    return (
+      <tr className="border-b border-gray-100 hover:bg-gray-50">
+        <td className="py-4 px-4">
+          <div>
+            <p className="font-medium text-gray-900">
+              {service.serviceName || "Untitled"}
+            </p>
+            <p className="text-sm text-gray-500">
+              {service.serviceCategory || "N/A"}
+            </p>
+          </div>
+        </td>
+        <td className="py-4 px-4 text-sm text-gray-900">
+          {/* {client?.name || "Unknown"} */}
+          {service.clientName || "N/A"}
+        </td>
+        <td className="py-4 px-4 text-sm text-gray-900">
+          {/* {Array.isArray(service?.assignedTo)
+            ? service.assignedTo.join(", ")
+            : service?.assignedTo || "Unassigned"} */}
+          {service.assignedTo || "N/A"}
+        </td>
+        <td className="py-4 px-4">
+          <span
+            className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(
+              service.statusName
+            )}`}
+          >
+            {service.statusName || "N/A"}
+          </span>
+        </td>
+        <td className="py-4 px-4">
+          <div className="flex items-center space-x-2">
+            <div className="flex-1 bg-gray-200 rounded-full h-2 min-w-[60px]">
+              <div
+                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${service.progressPercent || 0}%` }}
+              ></div>
+            </div>
+            <span className="text-sm text-gray-600 min-w-[35px]">
+              {service.progressPercent || 0}%
+            </span>
+          </div>
+        </td>
+        <td className="py-4 px-4 text-sm text-gray-600">
+          {service.dueDate
+            ? format(new Date(service.dueDate), "MMM d, yyyy")
+            : "-"}
+        </td>
+      </tr>
+    );
+  };
+  useEffect(() => {
+    fetchServiceTasks({
+      // serviceName: "",
+      // serviceType: "",
+      // clientName: selectedClient || "",
+      // statusName: selectedStatus || "",
+      serviceTemplateId: 0,
+      clientId: user?.clientId ? user.clientId : 0,
+      statusId: 0,
+    });
+  }, [fetchServiceTasks]);
   return (
     <div>
       {/* Header */}
@@ -311,98 +438,55 @@ export default function Dashboard() {
             Welcome back, {user?.name}!
           </h1>
           <p className="text-gray-600 mt-1">
-            Here's what's happening with your {user?.role === 'client' ? 'services' : 'work'} today.
+            Here's what's happening with your{" "}
+            {user?.role === "client" ? "services" : "work"} today.
           </p>
         </div>
         <div className="flex items-center space-x-2 mt-4 sm:mt-0">
           <Calendar className="h-5 w-5 text-gray-400" />
           <span className="text-sm text-gray-600">
-            {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            {format(new Date(), "EEEE, MMMM d, yyyy")}
           </span>
         </div>
       </div>
 
       {/* Role-specific content */}
-      {user?.role === 'admin' && renderAdminView()}
-      {(user?.role === 'staff' || user?.role === 'partner') && renderStaffPartnerView()}
-      {user?.role === 'client' && renderClientView()}
+      {/* {user?.role === 'admin' && */}
+      {renderAdminView()}
+      {/* } */}
+      {(user?.role === "staff" || user?.role === "partner") &&
+        renderStaffPartnerView()}
+      {user?.role === "client" && renderClientView()}
 
       {/* Recent Services */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            {user?.role === 'client' ? 'My Services' : 'Recent Services'}
+            {user?.role === "client" ? "My Services" : "Recent Services"}
           </h2>
-          <Link 
-            to="/services" 
+          <Link
+            to="/services"
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
             View all →
           </Link>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Service</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Client</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Status</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Progress</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Due Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {getRecentServices().map((service) => {
-                const client = mockClients.find(c => c.id === service.clientId);
-                return (
-                  <tr key={service.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{service.name}</p>
-                        <p className="text-sm text-gray-500">{service.serviceType}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2">
-                        <img 
-                          src={client?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(client?.name || 'Unknown')}&background=0ea5e9&color=fff`}
-                          alt={client?.name}
-                          className="h-6 w-6 rounded-full"
-                        />
-                        <span className="text-sm font-medium text-gray-900">{client?.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                        service.status === 'completed' ? 'bg-green-100 text-green-700' :
-                        service.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                        service.status === 'review' ? 'bg-yellow-100 text-yellow-700' :
-                        service.status === 'overdue' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {service.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[60px]">
-                          <div 
-                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                            style={{width: `${service.progress}%`}}
-                          ></div>
-                        </div>
-                        <span className="text-sm text-gray-600">{service.progress}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">
-                      {format(service.dueDate, 'MMM d, yyyy')}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+
+        <TableWithPagination
+          columns={[
+            { label: "Service", width: "w-[200px]" },
+            { label: "Client" },
+            { label: "Assigned To" },
+            { label: "Status", width: "w-[120px]" },
+            { label: "Progress" },
+            { label: "Due Date" },
+          ]}
+          data={servicesData}
+          showPagination={false}
+          renderRow={(service) => (
+            <ServiceRow key={service.serviceId} service={service} />
+          )}
+        />
       </div>
     </div>
   );
