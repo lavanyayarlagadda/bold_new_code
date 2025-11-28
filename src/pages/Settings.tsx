@@ -87,6 +87,7 @@ const Settings = () => {
           // oldPassword: "",
           // newPassword: "",
           updatedBy: profile.updatedBy,
+          phoneNumber: profile.phone,
         };
 
         const res = await updateUser(payload).unwrap();
@@ -112,7 +113,7 @@ const Settings = () => {
 
         const payload = {
           email: profile.email,
-          password: newPassword,
+          newPassword: newPassword,
         };
 
         const res = await resetPassword(payload).unwrap();

@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // { token, fullName, userId, roleId, clientId }
 
       const userData: User = {
-       userId: response.userId,
+       userId: response.loggedUserId,
         email: email,
         name: response.fullName,
         roleId: response.roleId, 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { UserItem } from "../redux/services/usersApi";
-import { Client, useGetAllClientsQuery } from "../redux/services/dropdownApi";
-import { Eye, EyeOff } from "lucide-react";
+import { Client, Role, useGetAllClientsQuery, useGetAllRolesQuery } from "../redux/services/dropdownApi";
+// import { Eye, EyeOff } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -20,8 +20,10 @@ export default function UserDrawer({
   onSubmit,
 }: Props) {
   const { data: clientsData } = useGetAllClientsQuery();
+  const {data:rolesData} = useGetAllRolesQuery();
 
   const [clientsDataState, setClientsDataState] = useState<Client[]>([]);
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
   // const [showPassword, setShowPassword] = useState(false);
   // const [showOldPassword, setShowOldPassword] = useState(false);
   // const [showNewPassword, setShowNewPassword] = useState(false);
@@ -41,6 +43,11 @@ export default function UserDrawer({
   useEffect(() => {
     if (clientsData?.data) setClientsDataState(clientsData.data);
   }, [clientsData]);
+
+  useEffect(() => {
+    if(rolesData?.data) setAllRoles(rolesData.data);
+  }, [rolesData])
+
 
   useEffect(() => {
     if (user) {
@@ -71,11 +78,11 @@ export default function UserDrawer({
   }, [user, mode]);
 
   if (!open) return null;
-  const roles = [
-    { roleId: 1, roleName: "Admin" },
-    { roleId: 2, roleName: "Staff" },
-    { roleId: 3, roleName: "User" },
-  ];
+  // const roles = [
+  //   { roleId: 1, roleName: "Admin" },
+  //   { roleId: 2, roleName: "Staff" },
+  //   { roleId: 3, roleName: "User" },
+  // ];
 
   if (mode === "edit" && !formData.email) {
     return (
@@ -226,7 +233,7 @@ export default function UserDrawer({
               className="w-full border px-3 py-2 rounded"
             >
               <option value="">Select Role</option>
-              {roles.map((r) => (
+              {allRoles.map((r) => (
                 <option key={r.roleId} value={r.roleId}>
                   {r.roleName}
                 </option>

@@ -107,6 +107,11 @@ export interface GetAllServiceTemplatesResponse {
   payload: any;
   data: ServiceTemplate[];
 }
+export interface GetAllRolesResponse {
+  statusCode: number;
+  message: string;
+  data: Role[];
+}
 
 export const dropdownApi = createApi({
   reducerPath: "dropdownApi",
@@ -138,6 +143,9 @@ export const dropdownApi = createApi({
     getAllUsers: builder.query<GetAllUsersResponse, void>({
       query: () => "ca/api/managementServices/getAllUsers",
     }),
+    getAllRoles: builder.query<GetAllRolesResponse, void>({
+      query: () => "ca/api/managementServices/getAllRoles",
+    }),
     getAllServiceTemplates: builder.mutation<
       GetAllServiceTemplatesResponse,
       void
@@ -166,4 +174,5 @@ export const {
   useGetAllUsersQuery,
   useGetAllServiceTemplatesMutation,
   useCreateUpdateTaskMutation,
+  useGetAllRolesQuery
 } = dropdownApi;

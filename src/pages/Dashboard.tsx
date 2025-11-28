@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  TrendingUp,
+  // TrendingUp,
   Users,
   FolderOpen,
   AlertTriangle,
@@ -10,7 +10,6 @@ import {
   Plus,
   UserPlus,
   Calendar,
-  Eye,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -24,12 +23,27 @@ import {
   ServiceTask,
   useFetchServiceTasksMutation,
 } from "../redux/services/serviceTasksApi";
+import {
+  Metric,
+  useDashboardMetricsQuery,
+} from "../redux/services/dashboardApi";
 import TableWithPagination from "../components/TableWithPagination";
 export default function Dashboard() {
   const { user } = useAuth();
   const stats = mockDashboardStats[user?.role || "client"];
-  const [fetchServiceTasks, { data, isLoading, error }] =
+  const [fetchServiceTasks, { data }] =
     useFetchServiceTasksMutation();
+  const { data: metricsData } = useDashboardMetricsQuery();
+
+  const [metrics, setMetrics] = useState<Metric>();
+  console.log("metricsdata:", metricsData);
+
+  useEffect(() => {
+    if (metricsData?.data) {
+      setMetrics(metricsData.data);
+      console.log("Metrics", metrics);
+    }
+  }, [metricsData]);
 
   const getRecentServices = () => {
     if (user?.role === "client") {
@@ -67,8 +81,8 @@ export default function Dashboard() {
     value,
     icon: Icon,
     color,
-    trend,
-  }: {
+  }: // trend,
+  {
     title: string;
     value: number;
     icon: React.ElementType;
@@ -80,12 +94,12 @@ export default function Dashboard() {
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-          {trend && (
+          {/* {trend && (
             <p className="text-xs text-green-600 mt-1 flex items-center">
               <TrendingUp className="h-3 w-3 mr-1" />
               {trend}
             </p>
-          )}
+          )} */}
         </div>
         <div className={`p-3 rounded-full ${color}`}>
           <Icon className="h-6 w-6 text-white" />
@@ -100,27 +114,27 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard
           title="Total Services"
-          value={stats.totalServices}
+          value={metrics?.totalServices ?? 0}
           icon={FolderOpen}
           color="bg-blue-500"
           trend="+12% from last month"
         />
         <StatCard
           title="Active Clients"
-          value={stats.activeClients}
+          value={metrics?.activeClients ?? 0}
           icon={Users}
           color="bg-green-500"
           trend="+8% from last month"
         />
         <StatCard
           title="Overdue Tasks"
-          value={stats.overdue}
+          value={metrics?.overdueTasks ?? 0}
           icon={AlertTriangle}
           color="bg-red-500"
         />
         <StatCard
           title="Documents"
-          value={stats.totalDocuments}
+          value={metrics?.documentCount ?? 0}
           icon={FileText}
           color="bg-purple-500"
           trend="+24% from last month"

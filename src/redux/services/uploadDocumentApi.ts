@@ -44,6 +44,14 @@ export const uploadDocumentApi = createApi({
         method: "GET",
       }),
     }),
+
+    getAllDocuments: builder.mutation({
+      query: (body) => ({
+        url: "ca/api/managementServices/getAllDocuments",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -52,4 +60,5 @@ export const {
   useViewDocumentMutation,
   useDownloadDocumentMutation,
   useDeleteDocumentMutation,
+  useGetAllDocumentsMutation
 } = uploadDocumentApi;

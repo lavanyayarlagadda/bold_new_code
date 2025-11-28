@@ -8,12 +8,14 @@ import {
   useGetUserDetailsByIdMutation,
   useUpdateUserByIdMutation,
   useCreateUserMutation,
+  useDeleteUserByIdMutation,
 } from "../redux/services/usersApi";
 import { PaginatedGrid } from "../components/PaginatedGrid";
 import TableWithPagination from "../components/TableWithPagination";
-import { Edit2 } from "lucide-react";
+import { Edit2, Trash2 } from "lucide-react";
 import UserDrawer from "../components/UserDrawer";
 import { toast } from "react-toastify";
+import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 
 const Users = () => {
   const { data, isLoading, error, refetch } = useFetchAllUsersDetailsQuery();
@@ -21,6 +23,7 @@ const Users = () => {
   const [updateUserById, { isLoading: updateLoading }] =
     useUpdateUserByIdMutation();
   const [createUser, { isLoading: createLoading }] = useCreateUserMutation();
+  const [deleteUserById] = useDeleteUserByIdMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -29,13 +32,33 @@ const Users = () => {
   const [openDrawer, setOpenDrawer] = useState(false);
   const [drawerMode, setDrawerMode] = useState<"create" | "edit">("create");
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
+  const [deletePopupOpen, setDeletePopupOpen] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
 
-  // ⬇️ Store API data into state
   useEffect(() => {
     if (data?.data) {
       setUsersData(data.data);
     }
   }, [data]);
+  const confirmDelete = async () => {
+    if (!deleteUserId) return;
+
+    try {
+      const res = await deleteUserById({ userId: deleteUserId }).unwrap();
+
+      if (res.statusCode === 200) {
+        toast.success("User deleted successfully!");
+        refetch();
+      } else {
+        toast.error(res.message || "Failed to delete user");
+      }
+    } catch (err) {
+      toast.error("Something went wrong");
+    }
+
+    setDeletePopupOpen(false);
+    setDeleteUserId(null);
+  };
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error fetching user data</div>;
@@ -45,7 +68,7 @@ const Users = () => {
       <tr className="border-b border-gray-100 hover:bg-gray-50">
         <td className="py-4 px-4">{user.fullName || "N/A"}</td>
         <td className="py-4 px-4 text-sm text-gray-900">
-          {user.contactPhone || "N/A"}
+          {user.phoneNumber || "N/A"}
         </td>
         <td className="py-4 px-4 text-sm text-gray-900">
           {user.email || "N/A"}
@@ -67,7 +90,7 @@ const Users = () => {
           </span>
         </td> */}
 
-        <td className="py-4 px-4">
+        <td className="py-4 px-4 flex gap-2">
           <button
             onClick={async () => {
               try {
@@ -89,53 +112,63 @@ const Users = () => {
           >
             <Edit2 className="h-4 w-4" />
           </button>
+          <button
+            onClick={() => {
+              setDeleteUserId(user.userId);
+              setDeletePopupOpen(true);
+            }}
+            className="inline-flex px-3 py-1 text-red-600 hover:bg-red-50 rounded-md"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </td>
       </tr>
     );
   };
 
-const handleUserSubmit = async (formData: any) => {
-  try {
-    if (drawerMode === "create") {
-      const payload = {
-        email: formData.email,
-        fullName: formData.fullName,
-        password: formData.password,
-        roleId: Number(formData.roleId),
-        clientId: Number(formData.clientId),
-        createdBy: 1,
-      };
+  const handleUserSubmit = async (formData: any) => {
+    try {
+      if (drawerMode === "create") {
+        const payload = {
+          email: formData.email,
+          fullName: formData.fullName,
+          password: formData.password,
+          roleId: Number(formData.roleId),
+          clientId: Number(formData.clientId),
+          createdBy: 1,
+          phoneNumber: Number(formData.phoneNumber),
+        };
 
-      const res = await createUser(payload).unwrap();
-      if (res.statusCode === 200) toast.success("User created successfully!");
-    } 
-    else if (drawerMode === "edit") {
-      const payload = {
-        userId: selectedUser?.userId,
-        fullName: formData.fullName,
-        email: formData.email,
-        roleId: Number(formData.roleId),
-        clientId: Number(formData.clientId),
-        oldPassword: formData.oldPassword || "",
-        newPassword: formData.newPassword || "",
-        updatedBy: 1,
-      };
+        const res = await createUser(payload).unwrap();
+        if (res.statusCode === 200) toast.success("User created successfully!");
+        if (res.statusCode === 409) toast.error(res.message);
+      } else if (drawerMode === "edit") {
+        const payload = {
+          userId: selectedUser?.userId,
+          fullName: formData.fullName,
+          email: formData.email,
+          roleId: Number(formData.roleId),
+          clientId: Number(formData.clientId),
+          oldPassword: formData.oldPassword || "",
+          newPassword: formData.newPassword || "",
+          updatedBy: 1,
+          phoneNumber: Number(formData.phoneNumber),
+        };
 
-      const res = await updateUserById(payload).unwrap();
-      if (res.statusCode === 200) toast.success("User updated successfully!");
+        const res = await updateUserById(payload).unwrap();
+        if (res.statusCode === 200) toast.success("User updated successfully!");
+      }
+
+      // ✅ Reset drawer state
+      setSelectedUser(null); // <-- IMPORTANT
+      setDrawerMode("create"); // optional
+      setOpenDrawer(false);
+
+      refetch();
+    } catch (error) {
+      toast.error("Something went wrong");
     }
-
-    // ✅ Reset drawer state
-    setSelectedUser(null);      // <-- IMPORTANT
-    setDrawerMode("create");    // optional
-    setOpenDrawer(false);
-
-    refetch();
-  } catch (error) {
-    toast.error("Something went wrong");
-  }
-};
-
+  };
 
   const filteredUsers = usersData.filter((user) => {
     const query = searchQuery.toLowerCase();
@@ -166,6 +199,8 @@ const handleUserSubmit = async (formData: any) => {
         showFilters={showFilters}
         setShowFilters={setShowFilters}
         rightArea={null} // your toggle buttons can go here
+        showRightArea={false}
+        showFilterButton={false}
       />
 
       {/* Example: show data */}
@@ -207,6 +242,14 @@ const handleUserSubmit = async (formData: any) => {
         mode={drawerMode}
         user={selectedUser}
         onSubmit={handleUserSubmit}
+      />
+
+      <DeleteConfirmDialog
+        open={deletePopupOpen}
+        onClose={() => setDeletePopupOpen(false)}
+        onConfirm={confirmDelete}
+        title="Confirm Delete"
+        message="Are you sure you want to delete this user?"
       />
     </div>
   );

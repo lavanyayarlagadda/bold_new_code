@@ -5,7 +5,8 @@ import { uploadDocumentApi } from "./services/uploadDocumentApi";
 import dropdownReducer from "./slices/dropdownSlice";
 import { usersApi } from "./services/usersApi";
 import { authApi } from "./services/authApi";
-
+import { dashboardApi } from "./services/dashboardApi";
+import { clientsApi } from "./services/clientsApi";
 
 export const store = configureStore({
   reducer: {
@@ -14,9 +15,11 @@ export const store = configureStore({
     [dropdownApi.reducerPath]: dropdownApi.reducer,
     [uploadDocumentApi.reducerPath]: uploadDocumentApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
-    [usersApi.reducerPath]:usersApi.reducer,
+    [usersApi.reducerPath]: usersApi.reducer,
+    [dashboardApi.reducerPath]: dashboardApi.reducer,
+    [clientsApi.reducerPath]: clientsApi.reducer,
 
-     // Regular slice
+    // Regular slice
     dropdown: dropdownReducer,
   },
   middleware: (getDefaultMiddleware) =>
@@ -25,8 +28,9 @@ export const store = configureStore({
       .concat(dropdownApi.middleware)
       .concat(uploadDocumentApi.middleware)
       .concat(authApi.middleware)
-      .concat(usersApi.middleware),
-
+      .concat(usersApi.middleware)
+      .concat(dashboardApi.middleware)
+      .concat(clientsApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

@@ -529,10 +529,10 @@ import {
   Tag,
   ChevronDown,
   Plus,
+  View,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { mockDocuments } from "../data/mockData";
-import { formatDistanceToNow } from "date-fns";
+
 import {
   Client,
   Status,
@@ -540,9 +540,28 @@ import {
   useGetAllServicesQuery,
 } from "../redux/services/dropdownApi";
 
-import { useUploadDocumentsMutation } from "../redux/services/uploadDocumentApi";
+import {
+  useUploadDocumentsMutation,
+  useGetAllDocumentsMutation,
+  useDeleteDocumentMutation,
+  useDownloadDocumentMutation,
+  useViewDocumentMutation,
+} from "../redux/services/uploadDocumentApi";
 import { toast } from "react-toastify";
 import { useFetchServiceTasksMutation } from "../redux/services/serviceTasksApi";
+import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
+import DocumentPreviewModal from "../components/ReusableComponents/DocumentPreviewModal";
+export interface DocumentItem {
+  documentId: number;
+  fileName: string;
+  fileSize: string;
+  serviceId: number;
+  serviceName: string;
+  clientName: string;
+  clientId: number;
+  uploadedBy: string;
+  createdDuration: string;
+}
 
 export default function Documents() {
   const { user } = useAuth();
@@ -551,9 +570,13 @@ export default function Documents() {
   const { data: statusData } = useGetAllServicesQuery();
   const [fetchServiceTasks, { data, isLoading, error }] =
     useFetchServiceTasksMutation();
+  const [viewDocument] = useViewDocumentMutation();
+  const [downloadDocument] = useDownloadDocumentMutation();
+  const [deleteDocument] = useDeleteDocumentMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [serviceFilter, setServiceFilter] = useState("all");
+  const [serviceFilter, setServiceFilter] = useState(0);
+  const [clientFilter, setClientFilter] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
@@ -565,10 +588,18 @@ export default function Documents() {
   const [clientsDataState, setClientsDataState] = useState<Client[]>([]);
   const [statusDataState, setStatusDataState] = useState<Status[]>([]);
   const [uploadedFilesList, setUploadedFilesList] = useState<File[]>([]);
- const [servicesDataState, setServicesDataState] = useState<any[]>([]);
+  const [servicesDataState, setServicesDataState] = useState<any[]>([]);
+  const [searchText, setSearchText] = useState("");
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const [uploadDocuments, { isLoading: isUploading }] =
     useUploadDocumentsMutation();
+  const [getAllDocuments, { data: documentsData }] =
+    useGetAllDocumentsMutation();
 
   const userId = user?.userId || 0;
   useEffect(() => {
@@ -582,11 +613,11 @@ export default function Documents() {
       statusId: 0,
     });
   }, [fetchServiceTasks]);
-useEffect(() => {
-  if (data?.data) {
-    setServicesDataState(data.data);   
-  }
-}, [data]);
+  useEffect(() => {
+    if (data?.data) {
+      setServicesDataState(data.data);
+    }
+  }, [data]);
 
   useEffect(() => {
     if (clientsData?.data) setClientsDataState(clientsData.data);
@@ -636,6 +667,66 @@ useEffect(() => {
   // ----------------------------
   // API UPLOAD
   // ----------------------------
+
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      loadDocuments();
+    }, 500); // debounce
+
+    return () => clearTimeout(delay);
+  }, [searchText, clientFilter, serviceFilter]);
+
+  const loadDocuments = async () => {
+    try {
+      const res = await getAllDocuments({
+        clientId: Number(clientFilter),
+        serviceId: Number(serviceFilter),
+        searchText: searchText,
+      }).unwrap();
+
+      setDocuments(res.data || []);
+    } catch (err) {
+      toast.error("Failed to fetch documents");
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (documentsData?.data) {
+      setDocuments(documentsData.data);
+    }
+  }, [documentsData]);
+
+  const handleView = async (doc: any) => {
+    try {
+      const res = await viewDocument(doc.documentId).unwrap();
+
+      if (res?.url) {
+        setPreviewUrl(res.url);
+        setPreviewOpen(true);
+      } else {
+        toast.error("Failed to fetch document URL");
+      }
+    } catch {
+      toast.error("Error viewing document");
+    }
+  };
+
+  const handleDownload = async (docId: number, fileName: string) => {
+    const blob = await downloadDocument(docId).unwrap();
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+
+    window.URL.revokeObjectURL(url);
+  };
   const handleSubmitUpload = async () => {
     if (uploadedFilesList.length === 0) {
       toast.error("Please select at least one file");
@@ -655,7 +746,7 @@ useEffect(() => {
     try {
       const res = await uploadDocuments(formData).unwrap();
       toast.success("Files uploaded successfully!");
-
+      loadDocuments();
       // clear files after upload
       setUploadedFilesList([]);
 
@@ -665,31 +756,25 @@ useEffect(() => {
       toast.error("Failed to upload documents");
     }
   };
+  const handleDeleteConfirm = async () => {
+    if (!selectedDocId) return;
 
-  // Filter documents
-  const filteredDocuments = useMemo(() => {
-    let filtered = mockDocuments;
+    try {
+      await deleteDocument({
+        documentId: selectedDocId,
+        userId: user?.userId,
+      }).unwrap();
 
-    if (user?.role === "client") {
-      filtered = filtered.filter((doc) => doc.isClientVisible);
+      toast.success("Document deleted successfully!");
+      loadDocuments(); // reload your list
+    } catch (err) {
+      toast.error("Failed to delete document");
     }
 
-    if (searchQuery) {
-      filtered = filtered.filter((doc) =>
-        doc.originalName.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+    setShowDeleteDialog(false);
+    setSelectedDocId(null);
+  };
 
-    if (serviceFilter !== "all") {
-      filtered = filtered.filter((doc) => doc.serviceId === serviceFilter);
-    }
-
-    return filtered;
-  }, [searchQuery, serviceFilter, user]);
-
-  // ----------------------------
-  // RENDER
-  // ----------------------------
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Document Hub</h1>
@@ -730,7 +815,7 @@ useEffect(() => {
               ))}
             </select>
           </div>
-          <button className="mt-4 w-full bg-green-600 text-white py-2 rounded disabled:bg-gray-400">Search documents</button>
+          {/* <button className="mt-4 w-full bg-green-600 text-white py-2 rounded disabled:bg-gray-400">Search documents</button> */}
         </div>
 
         {/* Right Upload Section */}
@@ -753,10 +838,10 @@ useEffect(() => {
               className="hidden"
             />
 
-            <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <Upload className="w-12 h-12 mx-auto mb-0 text-gray-400" />
 
-            <h3 className="text-lg font-medium mb-2">Upload Documents</h3>
-            <p className="text-gray-600 mb-4">
+            <h3 className="text-lg font-medium mb-0">Upload Documents</h3>
+            <p className="text-gray-600 mb-2">
               Drag & drop files here, or click the button
             </p>
 
@@ -788,34 +873,163 @@ useEffect(() => {
               ))}
             </div>
           )}
-
-          <button
-            disabled={!isUploadEnabled || uploadedFilesList.length === 0}
-            onClick={handleSubmitUpload}
-            className="mt-4 w-full bg-green-600 text-white py-2 rounded disabled:bg-gray-400"
-          >
-            {isUploading ? "Uploading..." : "Submit Upload"}
-          </button>
         </div>
       </div>
+      <button
+        disabled={!isUploadEnabled || uploadedFilesList.length === 0}
+        onClick={handleSubmitUpload}
+        className="mt-4 w-full bg-green-600 text-white py-2 rounded disabled:bg-gray-400"
+      >
+        {isUploading ? "Uploading..." : "Submit Upload"}
+      </button>
 
+      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 mt-4">
+        <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
+          {/* Search */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search documents..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+              <ChevronDown
+                className={`h-4 w-4 ml-1 transform transition-transform ${
+                  showFilters ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Options */}
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200">
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(Number(e.target.value))}
+              className="w-full border px-3 py-2 rounded"
+            >
+              <option value={0}>All Clients</option>
+              {clientsDataState.map((c) => (
+                <option key={c.clientId} value={c.clientId}>
+                  {c.clientName}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={serviceFilter}
+              onChange={(e) => setServiceFilter(Number(e.target.value))}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value={0}>All Services</option>
+              {servicesDataState.map((srv: any) => (
+                <option key={srv.serviceId} value={srv.serviceId}>
+                  {srv.serviceName}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => {
+                setServiceFilter(0);
+                setClientFilter(0);
+                setSearchText("");
+              }}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
+      </div>
       {/* Documents Grid */}
-      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10">
-        {filteredDocuments.map((doc) => {
-          const service = mockServices.find((s) => s.id === doc.serviceId);
-          const client = mockClients.find((c) => c.id === service?.clientId);
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        {documents.map((doc) => (
+          <div
+            key={doc?.documentId}
+            className="border p-4 rounded shadow-sm bg-white"
+          >
+            {/* File Name */}
+            <h3 className="font-semibold text-gray-900">{doc.fileName}</h3>
 
-          return (
-            <div key={doc.id} className="border p-4 rounded">
-              <h3 className="font-semibold">{doc.originalName}</h3>
-              <p className="text-sm text-gray-500">
-                {formatDistanceToNow(doc.uploadedAt)} ago
-              </p>
-              <p className="text-xs mt-2 text-blue-600">{service?.name}</p>
+            {/* Sub Details */}
+            <p className="text-sm text-gray-600 mt-1">
+              {doc.fileSize} • {doc.createdDuration}
+            </p>
+
+            {/* Service & Client */}
+            <p className="text-sm text-blue-600 mt-2">{doc.serviceName}</p>
+            <p className="text-sm text-gray-700">{doc.clientName}</p>
+
+            {/* Uploaded By */}
+            <p className="text-xs text-gray-500 mt-1">
+              Uploaded by {doc.uploadedBy}
+            </p>
+
+            {/* ACTION BUTTONS */}
+            <div className="flex gap-3 mt-4">
+              {/* View */}
+              <button
+                onClick={() => handleView(doc)}
+                className="p-2 rounded bg-blue-100 text-blue-600 hover:bg-blue-200"
+              >
+                <Eye size={18} />
+              </button>
+
+              {/* Download */}
+              <button
+                onClick={() => handleDownload(doc.documentId, doc.fileName)}
+                className="p-2 rounded bg-green-100 text-green-600 hover:bg-green-200"
+              >
+                <Download size={18} />
+              </button>
+
+              {/* Delete */}
+              <button
+                onClick={() => {
+                  setSelectedDocId(doc.documentId);
+                  setShowDeleteDialog(true);
+                }}
+                className="text-red-600 hover:text-red-800"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
-          );
-        })}
-      </div> */}
+          </div>
+        ))}
+      </div>
+
+      {documents.length === 0 && (
+        <p className="text-center text-gray-500 mt-10">No documents found</p>
+      )}
+
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Document"
+        message="Are you sure you want to delete this document? This action cannot be undone."
+      />
+
+      <DocumentPreviewModal
+        open={previewOpen}
+        url={previewUrl}
+        onClose={() => setPreviewOpen(false)}
+      />
     </div>
   );
 }

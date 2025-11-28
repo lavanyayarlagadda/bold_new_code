@@ -15,7 +15,7 @@ export interface UserItem {
   createdBy: number;
   updatedBy: number;
   isActive: number;
-  phoneNumber?:number;
+  phoneNumber?: number;
 }
 
 export interface FetchAllUsersResponse {
@@ -66,6 +66,13 @@ export const usersApi = createApi({
         body,
       }),
     }),
+    deleteUserById: builder.mutation({
+      query: (body) => ({
+        url: "ca/api/userManagementService/deleteUser",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -73,5 +80,6 @@ export const {
   useFetchAllUsersDetailsQuery,
   useGetUserDetailsByIdMutation,
   useUpdateUserByIdMutation,
-  useCreateUserMutation
+  useCreateUserMutation,
+  useDeleteUserByIdMutation
 } = usersApi;
