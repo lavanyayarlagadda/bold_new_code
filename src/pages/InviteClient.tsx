@@ -172,7 +172,7 @@ ${user?.organizationId === "org-1" ? "TaskFlow Team" : "Your Service Team"}`;
         </button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Invite Client/Partner
+            Invite Client
           </h1>
           <p className="text-gray-600">
             Send a formal invitation to onboard a new client or partner

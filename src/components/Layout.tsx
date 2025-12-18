@@ -29,33 +29,59 @@ export default function Layout({ children }: LayoutProps) {
     logout();
     navigate("/login");
   };
+  console.log("userDetails", user);
+  // const getNavItems = () => {
+  //   const baseItems = [
+  //     { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  //     { icon: FolderOpen, label: "Services & Tasks", path: "/services" },
+  //     { icon: FileText, label: "Documents", path: "/documents" },
+  //     // { icon: Users, label: "Clients", path: "/clients" },
+  //     // { icon: Settings, label: "Settings", path: "/settings" },
 
+  //   ];
+
+  //   if (user?.roleId === 1 ) {
+  //     return [
+  //       ...baseItems,
+  //         { icon: User, label: "Users", path: "/users" },
+  //       { icon: Users, label: "Clients", path: "/clients" },
+  //       { icon: Settings, label: "Settings", path: "/settings" },
+  //     ];
+  //   }
+
+  //   if (user?.roleId === 2) {
+  //     return [
+  //       ...baseItems,
+  //       { icon: Users, label: "Clients", path: "/clients" },
+  //     ];
+  //   }
+
+  //   return baseItems;
+  // };
   const getNavItems = () => {
     const baseItems = [
       { icon: LayoutDashboard, label: "Dashboard", path: "/" },
       { icon: FolderOpen, label: "Services & Tasks", path: "/services" },
       { icon: FileText, label: "Documents", path: "/documents" },
-      { icon: Users, label: "Clients", path: "/clients" },
-      { icon: Settings, label: "Settings", path: "/settings" },
-      { icon: User, label: "Users", path: "/users" },
     ];
 
-    // if (user?.role === "admin") {
-    //   return [
-    //     ...baseItems,
-    //     { icon: Users, label: "Clients", path: "/clients" },
-    //     { icon: Settings, label: "Settings", path: "/settings" },
-    //   ];
-    // }
+    const roleBasedItems = [];
 
-    // if (user?.role === "staff") {
-    //   return [
-    //     ...baseItems,
-    //     { icon: Users, label: "Clients", path: "/clients" },
-    //   ];
-    // }
+    if (user?.roleId === 1) {
+      roleBasedItems.push(
+        { icon: User, label: "Users", path: "/users" },
+        { icon: Users, label: "Clients", path: "/clients" }
+      );
+    }
 
-    return baseItems;
+    if (user?.roleId === 2) {
+      roleBasedItems.push({ icon: Users, label: "Clients", path: "/clients" });
+    }
+
+    return {
+      main: [...baseItems, ...roleBasedItems],
+      settings: { icon: Settings, label: "Settings", path: "/settings" },
+    };
   };
 
   const getRoleColor = (role: string) => {
@@ -101,7 +127,7 @@ export default function Layout({ children }: LayoutProps) {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        {/* <nav className="flex-1 px-4 py-6 space-y-2">
           {getNavItems().map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -122,6 +148,47 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
             );
           })}
+        </nav> */}
+        <nav className="flex-1 px-4 py-6 flex flex-col justify-between">
+          {/* Main navigation */}
+          <div className="space-y-2">
+            {getNavItems().main.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                >
+                  <Icon className="mr-3 h-5 w-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Settings - always last */}
+          <div className="pt-1  border-gray-200">
+            <Link
+              to={getNavItems().settings.path}
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                location.pathname === getNavItems().settings.path
+                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <Settings className="mr-3 h-5 w-5" />
+              Settings
+            </Link>
+          </div>
         </nav>
 
         {/* User profile */}

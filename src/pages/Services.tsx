@@ -872,7 +872,7 @@ export default function Services() {
             Manage your services and track progress
           </p>
         </div>
-        {/* {(user?.role === "admin" || user?.role === "staff") && ( */}
+        {(user?.roleId === 1 || user?.roleId === 2) && ( 
         <Link
           to="/services/new"
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mt-4 sm:mt-0"
@@ -880,7 +880,7 @@ export default function Services() {
           <Plus className="h-4 w-4 mr-2" />
           New Service
         </Link>
-        {/* )} */}
+        )} 
       </div>
 
       {/* Filters */}

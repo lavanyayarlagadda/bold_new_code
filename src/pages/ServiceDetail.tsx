@@ -481,7 +481,7 @@ export default function ServiceDetail() {
             <p className="text-gray-600">{service?.clientName}</p>
           </div>
         </div>
-        {/* {(user?.role === "admin" || user?.role === "staff") && ( */}
+        {(user?.roleId === 1 || user?.roleId === 2) && ( 
         <button
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           onClick={() => setIsEditService(true)}
@@ -489,7 +489,7 @@ export default function ServiceDetail() {
           <Edit className="h-4 w-4 mr-2" />
           Edit Service
         </button>
-        {/* // )} */}
+       )} 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1088,9 +1088,9 @@ export default function ServiceDetail() {
               />
 
               <div className="flex items-center justify-between">
-                {(user?.role === "admin" ||
-                  user?.role === "staff" ||
-                  user?.role === "partner") && (
+                {(user?.roleId === 1 ||
+                  user?.roleId === 2 ||
+                  user?.roleId === 3) && (
                   <label className="flex items-center space-x-2 text-sm">
                     <input
                       type="checkbox"

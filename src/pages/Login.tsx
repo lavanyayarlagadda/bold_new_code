@@ -44,12 +44,9 @@ export default function Login() {
     setLoading(true);
 
     const success = await login(email, password);
-    toast.success("Logged in successfully");
-    if (!success) {
-      setError("Invalid email or password");
-      toast.error("Login failed. Please check your credentials.");
-    }
+    console.log("success", success);
 
+    toast.success("Logged in successfully");
     setLoading(false);
   };
   const handleForgot = async () => {

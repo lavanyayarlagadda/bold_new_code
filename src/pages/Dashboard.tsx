@@ -31,8 +31,7 @@ import TableWithPagination from "../components/TableWithPagination";
 export default function Dashboard() {
   const { user } = useAuth();
   const stats = mockDashboardStats[user?.role || "client"];
-  const [fetchServiceTasks, { data }] =
-    useFetchServiceTasksMutation();
+  const [fetchServiceTasks, { data }] = useFetchServiceTasksMutation();
   const { data: metricsData } = useDashboardMetricsQuery();
 
   const [metrics, setMetrics] = useState<Metric>();
@@ -465,18 +464,15 @@ export default function Dashboard() {
       </div>
 
       {/* Role-specific content */}
-      {/* {user?.role === 'admin' && */}
-      {renderAdminView()}
-      {/* } */}
-      {(user?.role === "staff" || user?.role === "partner") &&
-        renderStaffPartnerView()}
-      {user?.role === "client" && renderClientView()}
+      {user?.roleId === 1 && renderAdminView()}
+      {/* {(user?.roleId === 2 || user?.roleId === 3) && renderStaffPartnerView()} */}
+      {/* {user?.roleId === 4 && renderClientView()} */}
 
       {/* Recent Services */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            {user?.role === "client" ? "My Services" : "Recent Services"}
+            {user?.roleId === 4 ? "My Services" : "Recent Services"}
           </h2>
           <Link
             to="/services"

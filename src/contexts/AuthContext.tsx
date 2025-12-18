@@ -32,15 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Call backend login API
       const response = await loginApi({ email, password }).unwrap();
-
-      // API response shape:
-      // { token, fullName, userId, roleId, clientId }
-
+  
       const userData: User = {
-       userId: response.loggedUserId,
+        userId: response.loggedUserId,
         email: email,
         name: response.fullName,
-        roleId: response.roleId, 
+        roleId: response.roleId,
         clientId: response.clientId,
         avatar: "",
         isOnboarded: true,
