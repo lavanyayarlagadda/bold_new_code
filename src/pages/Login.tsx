@@ -18,7 +18,7 @@ export default function Login() {
     useResetPasswordMutation();
 
   const [screen, setScreen] = useState<"login" | "forgot" | "otp" | "reset">(
-    "login"
+    "login",
   );
 
   const [email, setEmail] = useState("");
@@ -38,17 +38,35 @@ export default function Login() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setError("");
+  //   setLoading(true);
+
+  //   const success = await login(email, password);
+  //   console.log("success", success);
+
+  //   toast.success("Logged in successfully");
+  //   setLoading(false);
+  // };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const success = await login(email, password);
-    console.log("success", success);
-
-    toast.success("Logged in successfully");
-    setLoading(false);
+    try {
+      await login(email, password);
+      toast.success("Logged in successfully");
+    } catch (err: any) {
+      const message = err?.message || "Invalid email or password";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
+
   const handleForgot = async () => {
     if (!email) return toast.error("Enter your email");
 

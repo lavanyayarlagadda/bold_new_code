@@ -4,7 +4,7 @@ import { User } from "../types";
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
   isLoading: boolean;
   updateUser: (userData: Partial<User>) => void;
@@ -27,15 +27,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  // const login = async (email: string, password: string): Promise<boolean> => {
+  //   setIsLoading(true);
+  //   try {
+  //     // Call backend login API
+  //     const response = await loginApi({ email, password }).unwrap();
+
+  //     const userData: User = {
+  //       userId: response.loggedUserId,
+  //       email: email,
+  //       name: response.fullName,
+  //       roleId: response.roleId,
+  //       clientId: response.clientId,
+  //       avatar: "",
+  //       isOnboarded: true,
+  //     };
+
+  //     // Save JWT token
+  //     localStorage.setItem("token", response.token);
+
+  //     // Store user session
+  //     localStorage.setItem("user", JSON.stringify(userData));
+  //     setUser(userData);
+
+  //     setIsLoading(false);
+  //     return true;
+  //   } catch (err) {
+  //     console.error("Login failed:", err);
+  //     setIsLoading(false);
+  //     return false;
+  //   }
+  // };
+
+  const login = async (email: string, password: string): Promise<User> => {
     setIsLoading(true);
+
     try {
-      // Call backend login API
       const response = await loginApi({ email, password }).unwrap();
-  
+
+      //  CRITICAL CHECK
+      if (!response?.token) {
+        throw new Error(response?.message || "Invalid email or password");
+      }
+
       const userData: User = {
         userId: response.loggedUserId,
-        email: email,
+        email,
         name: response.fullName,
         roleId: response.roleId,
         clientId: response.clientId,
@@ -43,19 +80,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isOnboarded: true,
       };
 
-      // Save JWT token
       localStorage.setItem("token", response.token);
-
-      // Store user session
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
 
+      return userData;
+    } finally {
       setIsLoading(false);
-      return true;
-    } catch (err) {
-      console.error("Login failed:", err);
-      setIsLoading(false);
-      return false;
     }
   };
 
